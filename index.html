@@ -350,7 +350,7 @@ function App(){
   return(
     <div style={{maxWidth:440,margin:"0 auto",background:"#0f0f13",height:"100vh",display:"flex",flexDirection:"column"}}>
       <div style={{background:"linear-gradient(135deg,#7C5CFC,#5C3FD6)",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",color:"#fff",flexShrink:0}}>
-        <div><div style={{fontSize:20,fontWeight:900,letterSpacing:2}}>KadirV2</div><div style={{fontSize:10,opacity:0.6,letterSpacing:1}}>v3.1</div></div>
+        <div><div style={{fontSize:20,fontWeight:900,letterSpacing:2}}>KadirV2</div><div style={{fontSize:10,opacity:0.6,letterSpacing:1}}>v4.0</div></div>
         <div style={{fontSize:11,opacity:0.7,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{DS[(NOW.getDay()+6)%7]}<br/>{fD(NOW)}</div></div>
       <div className="scroll-area" style={{flex:1,padding:"12px 12px 80px",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
       {/* HOME */}
@@ -736,7 +736,7 @@ function App(){
             <Cd>
               <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🤖 Groq AI Asistan</div>
               <div style={{fontSize:12,color:"#666",marginBottom:10}}>Groq API anahtarını gir. Ücretsiz: console.groq.com</div>
-              <In type="password" value={groqKey} onChange={e=>sGroqKey(e.target.value)} placeholder="gsk_xxxxx..."/>
+              <In type="text" value={groqKey} onChange={e=>sGroqKey(e.target.value)} placeholder="gsk_xxxxx..." style={{fontSize:13,letterSpacing:0}}/>
               <div style={{marginTop:8,fontSize:12,color:groqKey?"#00C896":"#FF3B5C"}}>{groqKey?"✅ Anahtar kayıtlı (localStorage'da)":"❌ Anahtar girilmedi"}</div>
               {groqKey&&<Bt onClick={async()=>{sVReply("Test ediliyor...");sVShow(true);const r=await callGroq([{role:"user",content:"Merhaba, ben Kadir. Kısa bir selamlama yap."}],groqKey);sVReply(r);speak(r)}}>🧪 Bağlantıyı Test Et</Bt>}
             </Cd>
@@ -798,7 +798,7 @@ function App(){
               <SB2 onClick={()=>{if(confirm("Projeler ve görevler silinsin mi?")){sPj([]);sNt([]);alert("Silindi!")}}}>💼 Proje/görevleri sil</SB2>
               <SB2 onClick={()=>{if(confirm("⚠️ TÜM VERİLER SİLİNECEK! Emin misin?")){const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("kv2_"))keys.push(k);}keys.forEach(k=>localStorage.removeItem(k));alert("Tüm veriler silindi!");location.reload()}}} style={{color:"#FF3B5C",borderColor:"rgba(255,59,92,0.3)"}}>⚠️ Tüm verileri sıfırla</SB2>
             </Cd>
-            <Cd style={{textAlign:"center"}}><div style={{fontSize:11,color:"#444"}}>KadirV2 v3.1</div></Cd>
+            <Cd style={{textAlign:"center"}}><div style={{fontSize:11,color:"#444"}}>KadirV2 v4.0</div></Cd>
           </div>)}
         </div>)}
       </div>)}
