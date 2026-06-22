@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#534AB7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>KadirV2</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{height:100%;overflow:hidden}
+body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0f0f13;color:#e8e8e8;-webkit-font-smoothing:antialiased;overflow:hidden}
+#root{height:100%;overflow:hidden}
+input,textarea,select{font-family:inherit;font-size:14px;color:#e8e8e8}
+input[type=number]::-webkit-inner-spin-button{opacity:1}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.scroll-area{-webkit-overflow-scrolling:touch;overflow-y:auto;overflow-x:hidden}
+.scroll-area::-webkit-scrollbar{width:0;background:transparent}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useMemo,useEffect,useCallback,useRef}=React;
+const LS={get:(k,d)=>{try{const v=localStorage.getItem("kv2_"+k);return v?JSON.parse(v):typeof d==="function"?d():d}catch{return typeof d==="function"?d():d}},set:(k,v)=>{try{localStorage.setItem("kv2_"+k,JSON.stringify(v))}catch{}}};
+function useLS(key,init){const[val,setVal]=useState(()=>LS.get(key,init));const set=useCallback(v=>{setVal(prev=>{const nv=typeof v==="function"?v(prev):v;LS.set(key,nv);return nv})},[key]);return[val,set]}
+const DS=["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
+const MO=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+const dkf=d=>{const x=d instanceof Date?d:new Date(d);return`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`};
+const fD=d=>{const x=d instanceof Date?d:new Date(d);return x.toLocaleDateString("tr-TR",{day:"2-digit",month:"2-digit",year:"numeric"})};
+const fT=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+const sameDay=(a,b)=>dkf(a)===dkf(b);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const NOW=new Date();const TK=dkf(NOW);
+const tn=()=>{const n=new Date();return`${dkf(n)} ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`};
+const wkDates=d=>{const a=[],s=new Date(d);const dow=s.getDay();const diff=(dow+6)%7;s.setDate(s.getDate()-diff);for(let i=0;i<7;i++){const x=new Date(s);x.setDate(s.getDate()+i);a.push(x)}return a};
+const COLORS=["#7C5CFC","#00C896","#FF6B35","#FF3B5C","#E040FB","#00BCD4","#5C6BC0","#F4511E","#8E24AA","#43A047"];
+const PL={1:"🔴 Acil",2:"🟠 Yüksek",3:"🟡 Normal",4:"🟢 Düşük"};
+const PC={1:"#FF3B5C",2:"#FF6B35",3:"#FFB800",4:"#00C896"};
+const SC={done:"#00C896",pending:"#FFB800",miss:"#FF3B5C"};
+const SBG={done:"rgba(0,200,150,0.08)",pending:"rgba(255,184,0,0.08)",miss:"rgba(255,59,92,0.08)"};
+const SI={done:"✓",pending:"○",miss:"✕"};
+const REST={"kısa":60,normal:90,uzun:150};
+const DEF_CATS=["Yemek","Ulaşım","Market","Faturalar","Eğlence","Giyim","Sağlık","Diğer"];
+const MF=[{k:"kilo",l:"Kilo",u:"kg"},{k:"gogus",l:"Göğüs",u:"cm"},{k:"bel",l:"Bel",u:"cm"},{k:"kalca",l:"Kalça",u:"cm"},{k:"kol",l:"Kol",u:"cm"},{k:"bacak",l:"Bacak",u:"cm"},{k:"yag",l:"Vücut Yağ",u:"%"}];
+const ACC="#7C5CFC";
+/* UI */
+const Cd=({children,style,...p})=><div style={{background:"#1a1a24",borderRadius:16,padding:14,marginBottom:10,border:"1px solid rgba(255,255,255,0.06)",...style}} {...p}>{children}</div>;
+const Bt=({children,bg=ACC,style,...p})=><button style={{width:"100%",padding:14,background:bg,color:"#fff",border:"none",borderRadius:14,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginTop:8,...style}} {...p}>{children}</button>;
+const SB2=({children,style,...p})=><button style={{width:"100%",padding:12,background:"none",color:"#888",border:"1px solid rgba(255,255,255,0.1)",borderRadius:14,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginTop:8,...style}} {...p}>{children}</button>;
+const Pill=({children,bg,active,style,...p})=><button style={{padding:"6px 14px",background:active?bg:"rgba(255,255,255,0.06)",color:active?"#fff":"#888",border:"none",borderRadius:20,fontSize:12,fontWeight:active?700:400,cursor:"pointer",fontFamily:"inherit",...style}} {...p}>{children}</button>;
+const In=({style,...p})=><input style={{width:"100%",padding:"10px 12px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,fontSize:14,fontFamily:"inherit",outline:"none",background:"rgba(255,255,255,0.04)",color:"#e8e8e8",boxSizing:"border-box",...style}} {...p}/>;
+const Lb=({children})=><div style={{fontSize:12,color:"#666",marginBottom:4,marginTop:10}}>{children}</div>;
+const NB=({children,style,...p})=><button style={{width:34,height:34,border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,background:"rgba(255,255,255,0.04)",cursor:"pointer",fontSize:16,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",color:"#aaa",...style}} {...p}>{children}</button>;
+const MI=({style,...p})=><input style={{width:48,textAlign:"center",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"5px 4px",fontSize:13,outline:"none",fontFamily:"inherit",background:"rgba(255,255,255,0.04)",color:"#e8e8e8",...style}} {...p}/>;
+/* SVG CHART */
+function MiniChart({data,color=ACC,h=100,labels,unit="",title=""}){
+  if(!data||data.length<2)return<Cd style={{textAlign:"center",padding:20,color:"#444"}}><div style={{fontSize:12}}>{title||"Yeterli veri yok"}</div></Cd>;
+  const vals=data.map(d=>typeof d==="object"?d.v:d).filter(v=>v!=null&&!isNaN(v));
+  if(vals.length<2)return null;
+  const mn=Math.min(...vals),mx=Math.max(...vals),rng=mx-mn||1;
+  const W=320,H=h,pad=24,gW=W-pad*2,gH=H-pad*2;
+  const pts=vals.map((v,i)=>{const x=pad+i*(gW/(vals.length-1));const y=pad+gH-(((v-mn)/rng)*gH);return{x,y,v}});
+  const line=pts.map((p,i)=>i===0?`M${p.x},${p.y}`:`L${p.x},${p.y}`).join(" ");
+  const area=line+` L${pts[pts.length-1].x},${H-4} L${pts[0].x},${H-4} Z`;
+  const gid="g"+color.replace("#","")+(Math.random()*1000|0);
+  return<Cd style={{padding:"12px 8px"}}>
+    {title&&<div style={{fontSize:13,fontWeight:700,color:"#ddd",marginBottom:8,paddingLeft:6}}>{title}</div>}
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:h}}>
+      <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.3"/><stop offset="100%" stopColor={color} stopOpacity="0"/></linearGradient></defs>
+      <path d={area} fill={`url(#${gid})`}/><path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {pts.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="3.5" fill={color} stroke="#1a1a24" strokeWidth="2"/>)}
+      {pts.map((p,i)=><text key={`t${i}`} x={p.x} y={p.y-10} fill="#888" fontSize="9" textAnchor="middle" fontFamily="inherit">{p.v}{unit}</text>)}
+      {labels&&labels.map((l,i)=>{const x=pad+i*(gW/(labels.length-1));return<text key={`l${i}`} x={x} y={H-2} fill="#555" fontSize="8" textAnchor="middle" fontFamily="inherit">{l}</text>})}
+    </svg></Cd>}
+/* CALENDAR */
+function Cal({selected,onSelect,dotsFn}){
+  const sel=selected instanceof Date?selected:new Date(selected);
+  const[vy,sVy]=useState(sel.getFullYear());const[vm,sVm]=useState(sel.getMonth());
+  const fd=(new Date(vy,vm,1).getDay()+6)%7,dim=new Date(vy,vm+1,0).getDate();
+  const c=[];for(let i=0;i<fd;i++)c.push(null);for(let d=1;d<=dim;d++)c.push(d);
+  const pv=()=>{if(vm===0){sVm(11);sVy(y=>y-1)}else sVm(m=>m-1)};
+  const nx=()=>{if(vm===11){sVm(0);sVy(y=>y+1)}else sVm(m=>m+1)};
+  return(<Cd style={{padding:"14px 10px"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><NB onClick={pv}>‹</NB><span style={{fontSize:15,fontWeight:700,color:"#fff"}}>{MO[vm]} {vy}</span><NB onClick={nx}>›</NB></div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,textAlign:"center"}}>
+      {DS.map(d=><div key={d} style={{fontSize:10,color:"#555",padding:3,fontWeight:600}}>{d}</div>)}
+      {c.map((day,i)=>{if(!day)return<div key={`e${i}`}/>;
+        const dt=new Date(vy,vm,day),iS=sameDay(dt,sel),iT=sameDay(dt,NOW),da=dotsFn?.(dt)||[];
+        return(<div key={`d${day}`} onClick={()=>onSelect(new Date(vy,vm,day))} style={{padding:"7px 2px",borderRadius:10,cursor:"pointer",position:"relative",
+          background:iS?ACC:iT?"rgba(124,92,252,0.15)":"transparent",color:iS?"#fff":iT?"#B39DFF":"#aaa",fontWeight:iS||iT?700:400,fontSize:13}}>
+          {day}{da.length>0&&<div style={{display:"flex",gap:2,justifyContent:"center",position:"absolute",bottom:1,left:"50%",transform:"translateX(-50%)"}}>
+            {da.slice(0,4).map((cl,j)=><div key={j} style={{width:4,height:4,borderRadius:2,background:cl}}/>)}</div>}</div>)})}</div></Cd>)}
+/* REST TIMER */
+function RTimer({seconds:init,onDone,onClose,color}){
+  const[left,sL]=useState(init);const[paused,sP]=useState(false);const[done,sD]=useState(false);
+  useEffect(()=>{sL(init);sP(false);sD(false)},[init]);
+  useEffect(()=>{if(paused||done)return;if(left<=0){sD(true);onDone();return}const t=setTimeout(()=>sL(l=>l-1),1000);return()=>clearTimeout(t)},[left,paused,done,onDone]);
+  if(done)return<div style={{background:"rgba(0,200,150,0.1)",borderRadius:14,padding:"14px 18px",marginBottom:14,textAlign:"center"}}><span style={{fontSize:15,fontWeight:700,color:"#00C896"}}>✓ Dinlenme bitti!</span><br/><Pill bg="#00C896" active onClick={onClose} style={{marginTop:8}}>Kapat</Pill></div>;
+  const p=init>0?(left/init)*100:0;
+  return(<div style={{background:"rgba(124,92,252,0.08)",borderRadius:14,padding:"14px 18px",marginBottom:14,border:"1px solid rgba(124,92,252,0.2)"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color,fontWeight:600}}>⏱ Dinlenme</span><span style={{fontSize:28,fontWeight:900,fontVariantNumeric:"tabular-nums",color,letterSpacing:2}}>{fT(left)}</span></div>
+    <div style={{height:4,borderRadius:2,background:"rgba(255,255,255,0.08)",marginTop:10}}><div style={{height:4,borderRadius:2,background:color,width:`${p}%`,transition:"width 1s linear"}}/></div>
+    <div style={{display:"flex",gap:8,marginTop:10,justifyContent:"center"}}>
+      <Pill bg={color} active onClick={()=>sP(x=>!x)}>{paused?"▶ Devam":"⏸ Durdur"}</Pill>
+      <Pill bg="#555" active onClick={()=>{sL(init);sP(false);sD(false)}}>↻ Sıfırla</Pill>
+      <Pill bg="#00C896" active onClick={()=>{sD(true);onDone()}}>✓ Bitir</Pill></div></div>)}
+/* INIT DATA */
+const iW=()=>({
+  ant1:{name:"Göğüs + Triceps",color:"#7C5CFC",schedule:[1,4],exercises:[{id:uid(),name:"Bench Press",sets:4,reps:10,kg:60},{id:uid(),name:"İncline DB Press",sets:3,reps:12,kg:22},{id:uid(),name:"Cable Fly",sets:3,reps:15,kg:15},{id:uid(),name:"Triceps Pushdown",sets:3,reps:12,kg:25},{id:uid(),name:"Overhead Tri Ext",sets:3,reps:12,kg:20}]},
+  ant2:{name:"Sırt + Biceps",color:"#00C896",schedule:[2,5],exercises:[{id:uid(),name:"Lat Pulldown",sets:4,reps:10,kg:55},{id:uid(),name:"Barbell Row",sets:4,reps:10,kg:50},{id:uid(),name:"Seated Cable Row",sets:3,reps:12,kg:45},{id:uid(),name:"Barbell Curl",sets:3,reps:12,kg:25},{id:uid(),name:"Hammer Curl",sets:3,reps:12,kg:14}]},
+  ant3:{name:"Bacak + Omuz",color:"#FF6B35",schedule:[3],exercises:[{id:uid(),name:"Squat",sets:4,reps:10,kg:70},{id:uid(),name:"Leg Press",sets:3,reps:12,kg:120},{id:uid(),name:"Romanian Deadlift",sets:3,reps:10,kg:50},{id:uid(),name:"Shoulder Press",sets:3,reps:12,kg:18},{id:uid(),name:"Lateral Raise",sets:3,reps:15,kg:10}]}});
+const iH=()=>[{id:uid(),name:"Su iç",goal:"Günde 3L",type:"water",days:30,time:"08:00",reminder:true,waterSteps:[200,500],waterTarget:3000,subs:[],log:{}},{id:uid(),name:"Kitap oku",goal:"30 dakika",type:"check",days:21,time:"22:00",reminder:true,subs:[],log:{}},{id:uid(),name:"Meditasyon",goal:"10 dakika",type:"check",days:14,time:"07:00",reminder:true,subs:[],log:{}}];
+const iBooks=()=>[{id:uid(),title:"Atomik Alışkanlıklar",author:"James Clear",totalPages:320,currentPage:180,startDate:"2026-06-01",endDate:"",logs:[{date:"2026-06-17",pages:"170-180",note:"Alışkanlık döngüsü"}]}];
+const iProj=()=>[{id:"p1",name:"Eti Makine Box Robot",color:"#7C5CFC",tasks:[{id:uid(),title:"TwinCAT NC config",priority:1,start:"2026-06-16",end:"2026-06-20",done:false,notes:"P_2C2 kinematic",subtasks:[{id:uid(),text:"NC Task oluştur",done:true},{id:uid(),text:"Axis param",done:false}]},{id:uid(),title:"PLC yapısı",priority:2,start:"2026-06-18",end:"2026-06-25",done:false,notes:"",subtasks:[]},{id:uid(),title:"0x8145 hata çözümü",priority:1,start:"2026-06-17",end:"2026-06-19",done:false,notes:"Virtual MCS axes",subtasks:[]}]},{id:"p2",name:"Kişisel Gelişim",color:"#00C896",tasks:[{id:uid(),title:"TwinCAT eğitim dok",priority:2,start:"2026-06-10",end:"2026-06-30",done:false,notes:"",subtasks:[]}]}];
+const iNotes=()=>[{id:uid(),title:"Drive Parametreleri",projectId:"p1",priority:2,createdAt:"2026-06-18 14:30",blocks:[{id:uid(),type:"text",content:"AX5125 parametreleri kontrol edilecek."},{id:uid(),type:"checklist",items:[{id:uid(),text:"P-0-0001 kontrol",done:true},{id:uid(),text:"P-0-0003 encoder",done:false}]}]}];
+const iExp=()=>[{id:uid(),date:"2026-06-17",amount:85,cat:"Yemek",note:"Öğlen"},{id:uid(),date:"2026-06-17",amount:250,cat:"Ulaşım",note:"Benzin"},{id:uid(),date:"2026-06-16",amount:420,cat:"Market",note:"Haftalık"}];
+const iPay=()=>[{id:uid(),name:"Kira",amount:12000,day:1,cat:"Faturalar"},{id:uid(),name:"İnternet",amount:350,day:15,cat:"Faturalar"}];
+const iMs=()=>[{date:"2026-06-14",kilo:"78.5",gogus:"101",bel:"83",kalca:"97",kol:"36",bacak:"58",yag:"16"}];
+/* APP */
+function App(){
+  const[mt,sMt]=useState(0);
+  const[homeMode,sHomeMode]=useLS("homeMode",null);
+  // SPORT
+  const[wk,sWk]=useLS("wk",iW);const[rec,sRec]=useLS("rec",()=>[]);const[ms,sMs]=useLS("ms",iMs);
+  const[sTab,sSTab]=useState(0);const[cD,sCD]=useState(new Date());const[aW,sAW]=useState(null);
+  const[el,sEl]=useState(0);const[ck,sCk]=useState({});const[ev,sEv]=useState({});
+  const[rm,sRm]=useState("normal");const[rk,sRk]=useState(null);const[sr,sSr]=useState(true);
+  const[mI,sMI2]=useState(0);const[sv,sSv]=useState(false);
+  // HABITS
+  const[hb,sHb]=useLS("hb",iH);const[bk,sBk]=useLS("bk",iBooks);
+  const[hTab,sHTab]=useState(0);const[hD,sHD]=useState(new Date());const[shf,sShf]=useState(false);
+  const[bV,sBV]=useState(null);const[blf,sBlf]=useState(false);const[nlp,sNlp]=useState("");const[nln,sNln]=useState("");
+  const[hNewSubs,sHNewSubs]=useState([]);
+  // SLEEP
+  const[slp,sSlp]=useLS("slp",()=>[]);
+  const[slpCfg,sSlpCfg]=useLS("slpCfg",()=>({bedTarget:"00:00",wakeTarget:"05:00"}));
+  const[slpF,sSlpF]=useState(false);
+  // WORK
+  const[pj,sPj]=useLS("pj",iProj);const[nt,sNt]=useLS("nt",iNotes);
+  const[wV,sWV]=useState("main");const[pI,sPI]=useState(null);const[tS,sTS]=useState("priority");const[tF,sTF]=useState("active");
+  const[wCD,sWCD]=useState(new Date());const[oN,sON]=useState(null);const[xT,sXT]=useState(null);
+  // FINANCE
+  const[exp,sExp]=useLS("exp",iExp);const[pay,sPay]=useLS("pay",iPay);const[cats,sCats]=useLS("cats",()=>DEF_CATS);
+  const[fTab,sFTab]=useState(0);const[ef,sEf]=useState(false);const[ne,sNe]=useState({amount:"",cat:DEF_CATS[0],note:""});const[pf,sPf]=useState(false);
+  // SETTINGS
+  const[stS,sStS]=useState(null);const[eW,sEW]=useState(null);
+  // Timer
+  useEffect(()=>{if(!aW)return;const t=setInterval(()=>sEl(Math.floor((Date.now()-aW.startTime)/1000)),1000);return()=>clearInterval(t)},[aW]);
+  /* SPORT HELPERS */
+  const gsfd=d=>{const dow=d.getDay();const r=[];Object.entries(wk).forEach(([gk,g])=>{if(g.schedule.includes(dow))r.push({gk,g})});return r};
+  const startW=gk=>{const g=wk[gk];if(!g)return;const init={};g.exercises.forEach((ex,ei)=>{for(let s=1;s<=ex.sets;s++){init[`r-${ei}-${s}`]=ex.reps;init[`k-${ei}-${s}`]=ex.kg}});sEv(init);sAW({groupKey:gk,startTime:Date.now()});sCk({});sEl(0);sRk(null);sSr(true);sSTab(1)};
+  const finW=()=>{if(!aW)return;const g=wk[aW.groupKey];sRec(p=>[{dateStr:fD(new Date()),dateKey:dkf(new Date()),groupKey:aW.groupKey,name:g.name,duration:el,totalSets:g.exercises.reduce((a,e)=>a+e.sets,0),doneSets:Object.keys(ck).length},...p]);sAW(null);sCk({});sEl(0);sRk(null);sEv({})};
+  const togCk=(ei,si)=>{const k=`${ei}-${si}`;const w=ck[k];sCk(p=>{const n={...p};if(w)delete n[k];else n[k]=true;return n});if(!w){sRk(`${k}-${Date.now()}`);sSr(true)}};
+  const hRD=useCallback(()=>{try{navigator.vibrate?.([200,100,200])}catch{}},[]);
+  const moveEx=(gk,from,to)=>{if(to<0)return;const nw={...wk};const exs=[...nw[gk].exercises];if(to>=exs.length)return;const[item]=exs.splice(from,1);exs.splice(to,0,item);nw[gk]={...nw[gk],exercises:exs};sWk(nw)};
+  /* HABIT HELPERS */
+  const gHS=(h,dk2)=>{if(h.subs?.length)return getSubsStatus(h,dk2);if(h.log[dk2])return h.log[dk2];const d=new Date(dk2);const n=new Date();n.setHours(0,0,0,0);return d<n?"miss":"pending"};
+  const getSubsStatus=(h,dk2)=>{if(!h.subs?.length)return h.log[dk2]||"pending";const dayLog=h.log[dk2];if(!dayLog||typeof dayLog!=="object"){const d=new Date(dk2);const n=new Date();n.setHours(0,0,0,0);return d<n?"miss":"pending"}const all=h.subs.every(s=>dayLog[s.id]==="done");const some=h.subs.some(s=>dayLog[s.id]==="done");if(all)return"done";if(some)return"pending";const d=new Date(dk2);const n=new Date();n.setHours(0,0,0,0);return d<n?"miss":"pending"};
+  const togH=(hid,dk2,st)=>sHb(p=>p.map(h=>{if(h.id!==hid||h.subs?.length)return h;const l={...h.log};if(l[dk2]===st)delete l[dk2];else l[dk2]=st;return{...h,log:l}}));
+  const togSubH=(hid,dk2,subId)=>sHb(p=>p.map(h=>{if(h.id!==hid)return h;const l={...h.log};const day=typeof l[dk2]==="object"?{...l[dk2]}:{};day[subId]=day[subId]==="done"?"pending":"done";l[dk2]=day;return{...h,log:l}}));
+  const getSubStatus=(h,dk2,subId)=>{const dayLog=h.log[dk2];if(!dayLog||typeof dayLog!=="object")return"pending";return dayLog[subId]||"pending"};
+  const gWT=h=>{const v=h.log[dkf(NOW)];if(!v||v==="miss")return 0;if(typeof v==="number")return v;if(v==="done")return h.waterTarget||3000;return 0};
+  const addW=(hid,ml)=>sHb(p=>p.map(h=>{if(h.id!==hid)return h;const c=gWT(h);const nv=c+ml;return{...h,log:{...h.log,[dkf(NOW)]:nv>=(h.waterTarget||3000)?"done":nv}}}));
+  const gWP=h=>{const w=wkDates(new Date());return Math.round((w.filter(d=>gHS(h,dkf(d))==="done").length/7)*100)};
+  const getStreak=h=>{let s=0;const d=new Date();d.setDate(d.getDate()-1);for(let i=0;i<365;i++){if(gHS(h,dkf(d))==="done")s++;else break;d.setDate(d.getDate()-1)}if(gHS(h,dkf(NOW))==="done")s++;return s};
+  /* SLEEP HELPERS */
+  const todaySlp=slp.find(s=>s.date===TK);
+  const calcSleepHrs=(bed,wake)=>{if(!bed||!wake)return 0;const[bh,bm]=bed.split(":").map(Number);const[wh,wm]=wake.split(":").map(Number);let mins=(wh*60+wm)-(bh*60+bm);if(mins<0)mins+=1440;return Math.round(mins/6)/10};
+  const sleepDeviation=(actual,target)=>{const[ah,am]=(actual||"00:00").split(":").map(Number);const[th,tm]=(target||"00:00").split(":").map(Number);let diff=(ah*60+am)-(th*60+tm);if(diff>720)diff-=1440;if(diff<-720)diff+=1440;return Math.abs(diff)};
+  /* WORK HELPERS */
+  const aT=useMemo(()=>pj.flatMap((p,pi)=>p.tasks.map((t,ti)=>({...t,projName:p.name,projColor:p.color,projId:p.id,projIdx:pi,taskIdx:ti}))),[pj]);
+  const tT=aT.filter(t=>!t.done&&t.start<=TK&&t.end>=TK);const oT=aT.filter(t=>!t.done&&t.end<TK);
+  const uT=(pi,ti,u)=>sPj(p=>p.map((pr,i)=>i===pi?{...pr,tasks:pr.tasks.map((t,j)=>j===ti?{...t,...u}:t)}:pr));
+  const dT=(pi,ti)=>{if(!confirm("Sil?"))return;sPj(p=>p.map((pr,i)=>i===pi?{...pr,tasks:pr.tasks.filter((_,j)=>j!==ti)}:pr))};
+  const tgS=(pi,ti,sid)=>sPj(p=>p.map((pr,i)=>i===pi?{...pr,tasks:pr.tasks.map((t,j)=>j===ti?{...t,subtasks:t.subtasks.map(s=>s.id===sid?{...s,done:!s.done}:s)}:t)}:pr));
+  const aS=(pi,ti,txt)=>sPj(p=>p.map((pr,i)=>i===pi?{...pr,tasks:pr.tasks.map((t,j)=>j===ti?{...t,subtasks:[...t.subtasks,{id:uid(),text:txt,done:false}]}:t)}:pr));
+  const soT=tasks=>{const t=[...tasks];if(tS==="priority")t.sort((a,b)=>(a.done?1:0)-(b.done?1:0)||a.priority-b.priority);else t.sort((a,b)=>(a.done?1:0)-(b.done?1:0)||new Date(a.end)-new Date(b.end));return t};
+  const fiT=tasks=>tF==="active"?tasks.filter(t=>!t.done):tF==="done"?tasks.filter(t=>t.done):tasks;
+  const addN=n=>sNt(p=>[n,...p]);const upN=n=>sNt(p=>p.map(x=>x.id===n.id?n:x));const delN=id=>sNt(p=>p.filter(n=>n.id!==id));const pNt=pid=>nt.filter(n=>n.projectId===pid);
+  /* FINANCE */
+  const mExp=useMemo(()=>exp.filter(e=>e.date.startsWith(`${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,"0")}`)),[exp]);
+  const tMo=mExp.reduce((a,e)=>a+e.amount,0);
+  const bCat=useMemo(()=>{const m={};mExp.forEach(e=>{m[e.cat]=(m[e.cat]||0)+e.amount});return Object.entries(m).sort((a,b)=>b[1]-a[1])},[mExp]);
+  /* NOTE DETAIL */
+  if(oN){const note=nt.find(n=>n.id===oN);if(note){const proj=pj.find(p=>p.id===note.projectId);
+    return(<div style={{maxWidth:440,margin:"0 auto",background:"#0f0f13",height:"100vh",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"linear-gradient(135deg,#1a1a2e,#0f0f13)",padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}><div style={{fontSize:18,fontWeight:900,color:"#fff"}}>📝 {note.title}</div></div>
+      <div className="scroll-area" style={{flex:1,padding:"12px 12px 24px"}}>
+        <button onClick={()=>sON(null)} style={{background:"none",border:"none",color:ACC,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>← Geri</button>
+        <Cd style={{borderLeft:`3px solid ${proj?.color||"#333"}`}}><div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{note.title}</div>
+          <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>{proj&&<span style={{fontSize:10,background:`${proj.color}22`,color:proj.color,padding:"2px 8px",borderRadius:10,fontWeight:600}}>{proj.name}</span>}<span style={{fontSize:10,color:PC[note.priority],fontWeight:600}}>{PL[note.priority]}</span></div></Cd>
+        {note.blocks.map((bl,bi)=><div key={bl.id} style={{marginBottom:6}}>
+          {bl.type==="text"&&<Cd style={{padding:"10px 14px"}}><div style={{fontSize:14,color:"#ccc",lineHeight:1.6,whiteSpace:"pre-wrap",minHeight:20,cursor:"pointer"}} onClick={()=>{const t=prompt("Metin:",bl.content);if(t!==null){const nb=[...note.blocks];nb[bi]={...bl,content:t};upN({...note,blocks:nb})}}}>{bl.content||<span style={{color:"#444"}}>Tıkla ve yaz...</span>}</div></Cd>}
+          {bl.type==="checklist"&&<Cd style={{padding:"10px 14px"}}>{bl.items.map((it,ii)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:ii<bl.items.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+            <button onClick={()=>{const nb=[...note.blocks];nb[bi]={...bl,items:bl.items.map(x=>x.id===it.id?{...x,done:!x.done}:x)};upN({...note,blocks:nb})}} style={{width:22,height:22,borderRadius:6,border:it.done?"none":"2px solid #444",background:it.done?"#00C896":"transparent",color:"#fff",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>{it.done?"✓":""}</button>
+            <span style={{fontSize:13,flex:1,color:it.done?"#555":"#ccc",textDecoration:it.done?"line-through":"none",cursor:"pointer"}} onClick={()=>{const t=prompt("Düzenle:",it.text);if(t!==null){const nb=[...note.blocks];nb[bi]={...bl,items:bl.items.map(x=>x.id===it.id?{...x,text:t}:x)};upN({...note,blocks:nb})}}}>{it.text||"..."}</span></div>)}
+          <button onClick={()=>{const nb=[...note.blocks];nb[bi]={...bl,items:[...bl.items,{id:uid(),text:"",done:false}]};upN({...note,blocks:nb})}} style={{background:"none",border:"none",color:ACC,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,marginTop:4}}>+ Madde</button></Cd>}</div>)}
+        <div style={{display:"flex",gap:6,marginTop:8}}>
+          <Pill bg={ACC} active onClick={()=>upN({...note,blocks:[...note.blocks,{id:uid(),type:"text",content:""}]})}>📝 Metin</Pill>
+          <Pill bg="#00C896" active onClick={()=>upN({...note,blocks:[...note.blocks,{id:uid(),type:"checklist",items:[{id:uid(),text:"",done:false}]}]})}>☑️ Liste</Pill></div>
+      </div></div>)}}
+  /* REUSABLE DASH */
+  const WorkDash=()=><div>
+    {oT.length>0&&<Cd style={{background:"rgba(255,59,92,0.08)",border:"1px solid rgba(255,59,92,0.15)"}}><div style={{fontSize:14,fontWeight:700,color:"#FF3B5C"}}>⚠️ {oT.length} gecikmiş görev</div>{oT.slice(0,3).map(t=><div key={t.id} style={{fontSize:12,color:"#FF6B7A",padding:"2px 0"}}>• {t.title}</div>)}</Cd>}
+    {tT.slice(0,3).map(t=><Cd key={t.id} style={{borderLeft:`3px solid ${t.projColor}`,padding:"10px 14px"}}><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{t.title}</div><div style={{fontSize:11,color:"#555"}}>{t.projName}</div></Cd>)}
+    <div style={{fontSize:14,fontWeight:700,margin:"10px 0 8px",color:"#888"}}>📁 Projeler</div>
+    {pj.map((p,i)=>{const dn=p.tasks.filter(t=>t.done).length,tot=p.tasks.length,pct=tot?Math.round(dn/tot*100):0;
+      return<Cd key={p.id} style={{borderLeft:`3px solid ${p.color}`,cursor:"pointer"}} onClick={()=>{sPI(i);sWV("project");sMt(3)}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{p.name}</div><div style={{fontSize:11,color:"#666"}}>{tot} görev</div></div>
+        <div style={{fontSize:18,fontWeight:900,color:pct===100?"#00C896":p.color}}>{pct}%</div></div></Cd>})}</div>;
+  const PersonalDash=()=><div>
+    {gsfd(NOW).map(({gk,g})=><Cd key={gk} style={{borderLeft:`3px solid ${g.color}`}}>
+      <div style={{fontSize:11,color:"#666"}}>Bugünün Antrenmanı</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{g.name}</div>
+        <Pill bg={g.color} active onClick={()=>{startW(gk);sMt(1)}}>Başla →</Pill></div></Cd>)}
+    <div style={{fontSize:14,fontWeight:700,margin:"10px 0 8px",color:"#888"}}>🎯 Alışkanlıklar</div>
+    {hb.map(h=>{const s=gHS(h,dkf(NOW));
+      if(h.type==="water"){const cur=gWT(h);const pct=Math.min(100,Math.round(cur/(h.waterTarget||3000)*100));
+        return<Cd key={h.id} style={{borderLeft:`3px solid ${pct>=100?"#00C896":"#4FC3F7"}`}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#ddd"}}>💧 {cur}ml / {h.waterTarget||3000}ml</div>
+          <div style={{height:6,borderRadius:3,background:"rgba(255,255,255,0.06)",marginTop:6}}><div style={{height:6,borderRadius:3,background:pct>=100?"#00C896":"#4FC3F7",width:`${pct}%`}}/></div>
+          <div style={{display:"flex",gap:6,marginTop:6}}>{(h.waterSteps||[200,500]).map(ml=><Pill key={ml} bg="#4FC3F7" active onClick={()=>addW(h.id,ml)}>+{ml}ml</Pill>)}</div></Cd>}
+      return<Cd key={h.id} style={{borderLeft:`3px solid ${SC[s]}`,background:SBG[s]}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{h.name}</div></div>
+          {h.subs?.length?<span style={{fontSize:14,color:SC[s],fontWeight:700}}>{SI[s]}</span>:
+          <div style={{display:"flex",gap:4}}>
+            <button onClick={()=>togH(h.id,dkf(NOW),"done")} style={{width:32,height:32,borderRadius:8,border:"none",cursor:"pointer",background:s==="done"?"#00C896":"rgba(0,200,150,0.15)",color:s==="done"?"#fff":"#00C896",fontSize:14,fontWeight:700}}>✓</button>
+            <button onClick={()=>togH(h.id,dkf(NOW),"miss")} style={{width:32,height:32,borderRadius:8,border:"none",cursor:"pointer",background:s==="miss"?"#FF3B5C":"rgba(255,59,92,0.15)",color:s==="miss"?"#fff":"#FF3B5C",fontSize:12,fontWeight:700}}>✕</button></div>}
+        </div>
+        {h.subs?.length>0&&<div style={{marginTop:6}}>{h.subs.map(sub=>{const ss=getSubStatus(h,dkf(NOW),sub.id);
+          return<div key={sub.id} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0"}}>
+            <button onClick={()=>togSubH(h.id,dkf(NOW),sub.id)} style={{width:20,height:20,borderRadius:5,border:ss==="done"?"none":"2px solid #444",background:ss==="done"?"#00C896":"transparent",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>{ss==="done"?"✓":""}</button>
+            <span style={{fontSize:12,color:ss==="done"?"#555":"#ccc"}}>{sub.name}</span></div>})}</div>}</Cd>})}
+    {todaySlp&&<Cd style={{borderLeft:`3px solid #8E24AA`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>😴 Uyku</div>
+        <div style={{fontSize:18,fontWeight:900,color:todaySlp.score>=70?"#00C896":todaySlp.score>=40?"#FFB800":"#FF3B5C"}}>{todaySlp.score}/100</div></div>
+      <div style={{fontSize:11,color:"#666"}}>{todaySlp.bed} → {todaySlp.wake} • {calcSleepHrs(todaySlp.bed,todaySlp.wake)}sa</div></Cd>}
+    <Cd><div style={{fontSize:14,fontWeight:700,color:"#888"}}>💰 Bu Ay</div><div style={{fontSize:24,fontWeight:900,color:"#FF3B5C"}}>₺{tMo.toLocaleString("tr-TR")}</div></Cd>
+  </div>;
+  /* MAIN RENDER */
+  const mainTabs=[{i:"🏠",l:"Ana"},{i:"🏋️",l:"Spor"},{i:"🎯",l:"Alışkanlık"},{i:"💼",l:"İş"},{i:"💰",l:"Finans"},{i:"⚙️",l:"Ayarlar"}];
+  return(
+    <div style={{maxWidth:440,margin:"0 auto",background:"#0f0f13",height:"100vh",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"linear-gradient(135deg,#7C5CFC,#5C3FD6)",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",color:"#fff",flexShrink:0}}>
+        <div><div style={{fontSize:20,fontWeight:900,letterSpacing:2}}>KadirV2</div><div style={{fontSize:10,opacity:0.6,letterSpacing:1}}>v3.1</div></div>
+        <div style={{fontSize:11,opacity:0.7,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{DS[(NOW.getDay()+6)%7]}<br/>{fD(NOW)}</div></div>
+      <div className="scroll-area" style={{flex:1,padding:"12px 12px 80px",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      {/* HOME */}
+      {mt===0&&(<div style={{animation:"fadeIn 0.3s ease"}}>
+        <div style={{fontSize:22,fontWeight:900,marginBottom:2,color:"#fff"}}>Merhaba Kadir ⚡</div>
+        <div style={{fontSize:12,color:"#555",marginBottom:14}}>{fD(NOW)}</div>
+        {!homeMode?<div>
+          <div style={{fontSize:14,fontWeight:700,color:"#888",marginBottom:10}}>Mod seç</div>
+          {[{k:"work",i:"💼",t:"İş Modu",d:"Projeler, görevler, notlar",bg:"linear-gradient(135deg,#5C6BC0,#3F51B5)"},
+            {k:"personal",i:"🌙",t:"Kişisel Mod",d:"Spor, alışkanlık, uyku, finans",bg:"linear-gradient(135deg,#00C896,#009688)"},
+            {k:"all",i:"⚡",t:"Hepsi",d:"Tüm modüller tek sayfada",bg:"linear-gradient(135deg,#7C5CFC,#5C3FD6)"}
+          ].map(m=><Cd key={m.k} style={{cursor:"pointer",background:m.bg,border:"none",padding:20}} onClick={()=>sHomeMode(m.k)}>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <span style={{fontSize:36}}>{m.i}</span>
+              <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{m.t}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{m.d}</div></div>
+              <span style={{marginLeft:"auto",fontSize:20,color:"rgba(255,255,255,0.5)"}}>→</span></div></Cd>)}
+        </div>:
+        <div>
+          <div style={{display:"flex",gap:4,marginBottom:12}}>
+            {[{k:"work",l:"💼 İş"},{k:"personal",l:"🌙 Kişisel"},{k:"all",l:"⚡ Hepsi"}].map(m=><Pill key={m.k} bg={ACC} active={homeMode===m.k} onClick={()=>sHomeMode(m.k)} style={{flex:1,textAlign:"center"}}>{m.l}</Pill>)}</div>
+          {homeMode==="work"&&<WorkDash/>}
+          {homeMode==="personal"&&<PersonalDash/>}
+          {homeMode==="all"&&<div><WorkDash/><div style={{height:1,background:"rgba(255,255,255,0.06)",margin:"14px 0"}}/><PersonalDash/></div>}
+        </div>}
+      </div>)}
+      {/* SPOR */}
+      {mt===1&&(<div style={{animation:"fadeIn 0.3s ease"}}>
+        <div style={{display:"flex",gap:4,marginBottom:12}}>{[{i:"📅",l:"Takvim"},{i:"💪",l:"Antrenman"},{i:"📦",l:"Kayıtlar"},{i:"📐",l:"Ölçüm"}].map((ic,i)=><button key={i} onClick={()=>sSTab(i)} style={{flex:1,padding:"8px 4px",fontSize:11,fontWeight:sTab===i?700:400,color:sTab===i?ACC:"#666",background:sTab===i?"rgba(124,92,252,0.12)":"rgba(255,255,255,0.03)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit"}}>{ic.i}<br/><span style={{fontSize:9}}>{ic.l}</span></button>)}</div>
+        {sTab===0&&<div><Cal selected={cD} onSelect={sCD} dotsFn={d=>{if(rec.find(r=>r.dateKey===dkf(d)))return["#00C896"];const sc=gsfd(d);return sc.length?[sc[0].g.color]:[]}}/>
+          {(()=>{const sc=gsfd(cD);const r=rec.find(r2=>r2.dateKey===dkf(cD));
+            if(r)return<Cd style={{borderLeft:`3px solid ${wk[r.groupKey]?.color||"#444"}`}}><div style={{fontSize:12,color:"#00C896",fontWeight:600}}>✓ Tamamlandı</div><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{r.name}</div><div style={{fontSize:13,color:"#666"}}>{fT(r.duration)} • {r.doneSets}/{r.totalSets} set</div></Cd>;
+            if(!sc.length)return<Cd style={{textAlign:"center",padding:24,color:"#444"}}>🌙 Dinlenme günü</Cd>;
+            return sc.map(({gk,g})=><Cd key={gk} style={{borderLeft:`3px solid ${g.color}`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{g.name}</div><div style={{fontSize:12,color:"#666"}}>{g.exercises.length} hareket</div></div><Pill bg={g.color} active onClick={()=>startW(gk)}>Başla</Pill></div></Cd>)})()}</div>}
+        {sTab===1&&<div>{!aW?<div><div style={{textAlign:"center",padding:"40px 16px",color:"#444"}}><div style={{fontSize:44,marginBottom:8}}>💪</div><div style={{fontSize:15,fontWeight:600,color:"#666"}}>Aktif antrenman yok</div></div>
+            {Object.entries(wk).map(([gk,g])=><Bt key={gk} bg={g.color} onClick={()=>startW(gk)}>{g.name}</Bt>)}</div>:
+          <div><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{wk[aW.groupKey].name}</div><div style={{fontSize:28,fontWeight:900,fontVariantNumeric:"tabular-nums",color:wk[aW.groupKey].color,letterSpacing:2}}>{fT(el)}</div></div>
+            <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:11,color:"#555"}}>Dinlenme:</span>
+              {Object.entries(REST).map(([m,sec])=><Pill key={m} bg={ACC} active={rm===m} onClick={()=>sRm(m)}>{m} ({sec}s)</Pill>)}</div>
+            {rk&&sr&&<RTimer key={rk} seconds={REST[rm]} onDone={hRD} onClose={()=>sSr(false)} color={wk[aW.groupKey].color}/>}
+            {wk[aW.groupKey].exercises.map((ex,ei)=>{const tot=ex.sets,dn=Array.from({length:tot},(_,i)=>i+1).filter(si=>ck[`${ei}-${si}`]).length;
+              return<div key={ei} style={{marginBottom:16}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:15,fontWeight:700,color:"#ddd"}}>{ex.name}</span><span style={{fontSize:12,color:dn===tot?"#00C896":"#444",fontWeight:600}}>{dn}/{tot}</span></div>
+                {Array.from({length:ex.sets},(_,si)=>si+1).map(si=>{const c2=ck[`${ei}-${si}`];
+                  return<div key={si} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:c2?"rgba(124,92,252,0.08)":"rgba(255,255,255,0.02)",borderRadius:10,marginBottom:3,borderLeft:c2?`3px solid ${wk[aW.groupKey].color}`:"3px solid transparent"}}>
+                    <div onClick={()=>togCk(ei,si)} style={{width:24,height:24,borderRadius:8,border:c2?"none":"2px solid #444",background:c2?wk[aW.groupKey].color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer",color:"#fff",fontSize:13,fontWeight:800}}>{c2?"✓":""}</div>
+                    <span style={{fontSize:12,color:"#555",width:28}}>S{si}</span>
+                    <MI type="number" value={ev[`r-${ei}-${si}`]??ex.reps} onChange={e=>sEv(p=>({...p,[`r-${ei}-${si}`]:e.target.value}))}/>
+                    <span style={{fontSize:11,color:"#444"}}>×</span>
+                    <MI type="number" step="0.5" value={ev[`k-${ei}-${si}`]??ex.kg} onChange={e=>sEv(p=>({...p,[`k-${ei}-${si}`]:e.target.value}))}/>
+                    <span style={{fontSize:11,color:"#444"}}>kg</span></div>})}</div>})}
+            <Bt bg="#00C896" onClick={finW}>✓ Antrenmanı Bitir ({fT(el)})</Bt>
+            <SB2 onClick={()=>{sAW(null);sCk({});sRk(null);sEv({})}}>İptal</SB2></div>}</div>}
+        {sTab===2&&<div>{rec.length>=2&&<MiniChart data={rec.slice(0,10).reverse().map(r=>({v:r.doneSets}))} color="#00C896" title="📈 Son Antrenmanlar (set)" labels={rec.slice(0,10).reverse().map(r=>r.dateStr?.slice(0,5))}/>}
+          {rec.length===0?<Cd style={{textAlign:"center",padding:48,color:"#444"}}>📦 Henüz kayıt yok</Cd>:
+          rec.map((r,i)=><Cd key={i} style={{borderLeft:`3px solid ${wk[r.groupKey]?.color||"#444"}`}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:12,color:"#555"}}>{r.dateStr}</div><div style={{fontSize:14,fontWeight:700,color:"#ddd",marginTop:2}}>{r.name}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:800,fontVariantNumeric:"tabular-nums",color:"#fff"}}>{fT(r.duration)}</div><div style={{fontSize:11,color:"#555"}}>{r.doneSets}/{r.totalSets} set</div></div></div></Cd>)}</div>}
+        {sTab===3&&<div>{ms.length>=2&&<MiniChart data={ms.slice(0,10).reverse().filter(m=>m.kilo).map(m=>({v:+m.kilo}))} color="#E040FB" title="📊 Kilo Değişimi" labels={ms.slice(0,10).reverse().filter(m=>m.kilo).map(m=>m.date?.slice(5))} unit="kg"/>}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}><NB onClick={()=>sMI2(Math.min(mI+1,ms.length-1))}>←</NB><span style={{fontSize:15,fontWeight:700,color:"#fff"}}>{ms[mI]?.date||"—"}</span><NB onClick={()=>sMI2(Math.max(mI-1,0))}>→</NB></div>
+          <Cd>{MF.map((f,i)=><div key={f.k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:i<MF.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}><span style={{fontSize:13,color:"#888"}}>{f.l}</span><div style={{display:"flex",alignItems:"center",gap:4}}><input type="number" step="0.1" value={ms[mI]?.[f.k]||""} placeholder="—" onChange={e=>{const nm=[...ms];nm[mI]={...nm[mI],[f.k]:e.target.value};sMs(nm)}} style={{width:72,textAlign:"right",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:8,fontSize:13,outline:"none",fontFamily:"inherit",background:"rgba(255,255,255,0.04)",color:"#e8e8e8"}}/><span style={{fontSize:12,color:"#555",width:24}}>{f.u}</span></div></div>)}</Cd>
+          <Bt bg={sv?"#00C896":ACC} onClick={()=>{sSv(true);setTimeout(()=>sSv(false),1500)}}>{sv?"✓ Kaydedildi":"Kaydet"}</Bt>
+          <SB2 onClick={()=>{const d=dkf(new Date());if(ms[0]?.date===d)return;const o={date:d};MF.forEach(f=>o[f.k]="");sMs(p=>[o,...p]);sMI2(0)}}>+ Yeni Ölçüm</SB2></div>}
+      </div>)}
+      {/* ALIŞKANLIKLAR */}
+      {mt===2&&(<div style={{animation:"fadeIn 0.3s ease"}}>
+        <div style={{display:"flex",gap:4,marginBottom:12}}>{["📅 Günlük","📊 Log","😴 Uyku","📚 Kitap"].map((t,i)=><button key={i} onClick={()=>sHTab(i)} style={{flex:1,padding:"8px 4px",fontSize:10,fontWeight:hTab===i?700:400,color:hTab===i?ACC:"#666",background:hTab===i?"rgba(124,92,252,0.12)":"rgba(255,255,255,0.03)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit"}}>{t}</button>)}</div>
+        {hTab===0&&<div>
+          <Cal selected={hD} onSelect={sHD} dotsFn={d=>{const k=dkf(d);return hb.map(h=>{const s=gHS(h,k);return s==="done"?SC.done:s==="miss"?SC.miss:SC.pending})}}/>
+          {hb.map(h=>{const k=dkf(hD);const s=gHS(h,k);
+            if(h.type==="water"){const cur=typeof h.log[k]==="number"?h.log[k]:h.log[k]==="done"?(h.waterTarget||3000):0;const pct=Math.min(100,Math.round(cur/(h.waterTarget||3000)*100));
+              return<Cd key={h.id} style={{borderLeft:`3px solid ${pct>=100?"#00C896":"#4FC3F7"}`}}><div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>💧 {h.name} — {cur}ml / {h.waterTarget||3000}ml</div>
+                <div style={{height:8,borderRadius:4,background:"rgba(255,255,255,0.06)",marginTop:6}}><div style={{height:8,borderRadius:4,background:pct>=100?"#00C896":"#4FC3F7",width:`${pct}%`}}/></div>
+                {sameDay(hD,NOW)&&<div style={{display:"flex",gap:6,marginTop:8}}>{(h.waterSteps||[200,500]).map(ml=><Pill key={ml} bg="#4FC3F7" active onClick={()=>addW(h.id,ml)}>+{ml}ml</Pill>)}</div>}</Cd>}
+            return<Cd key={h.id} style={{borderLeft:`3px solid ${SC[s]}`,background:SBG[s]}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>{h.name}</div><div style={{fontSize:11,color:"#666"}}>{h.time} • {h.goal}</div></div>
+                {(!h.subs||!h.subs.length)&&<div style={{display:"flex",gap:4}}>
+                  <button onClick={()=>togH(h.id,k,"done")} style={{width:36,height:36,borderRadius:10,border:"none",cursor:"pointer",background:s==="done"?"#00C896":"rgba(0,200,150,0.15)",color:s==="done"?"#fff":"#00C896",fontSize:16,fontWeight:800}}>✓</button>
+                  <button onClick={()=>togH(h.id,k,"miss")} style={{width:36,height:36,borderRadius:10,border:"none",cursor:"pointer",background:s==="miss"?"#FF3B5C":"rgba(255,59,92,0.15)",color:s==="miss"?"#fff":"#FF3B5C",fontSize:14,fontWeight:800}}>✕</button></div>}
+                {h.subs?.length>0&&<span style={{fontSize:14,color:SC[s],fontWeight:700}}>{SI[s]}</span>}</div>
+              {h.subs?.length>0&&<div style={{marginTop:8}}>{h.subs.map(sub=>{const ss=getSubStatus(h,k,sub.id);
+                return<div key={sub.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <button onClick={()=>togSubH(h.id,k,sub.id)} style={{width:22,height:22,borderRadius:6,border:ss==="done"?"none":"2px solid #444",background:ss==="done"?"#00C896":"transparent",color:"#fff",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>{ss==="done"?"✓":""}</button>
+                  <span style={{fontSize:13,color:ss==="done"?"#666":"#ccc",textDecoration:ss==="done"?"line-through":"none"}}>{sub.name}</span></div>})}</div>}</Cd>})}
+          {shf?<Cd><Lb>Ad</Lb><In id="hn" placeholder="Alışkanlık adı (ör: Namaz)"/><Lb>Hedef</Lb><In id="hg" placeholder="Hedef (ör: 5 vakit)"/>
+            <div style={{display:"flex",gap:8}}><div style={{flex:1}}><Lb>Gün</Lb><In id="hd" type="number" defaultValue={30}/></div><div style={{flex:1}}><Lb>Saat</Lb><In id="ht" type="time" defaultValue="08:00"/></div></div>
+            <Lb>Alt adımlar (opsiyonel)</Lb>
+            {hNewSubs.map((s,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+              <In value={s} style={{flex:1}} onChange={e=>{const ns=[...hNewSubs];ns[i]=e.target.value;sHNewSubs(ns)}} placeholder={`Alt adım ${i+1}`}/>
+              <button onClick={()=>sHNewSubs(p=>p.filter((_,j)=>j!==i))} style={{background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button></div>)}
+            <button onClick={()=>sHNewSubs(p=>[...p,""])} style={{background:"none",border:"none",color:ACC,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,marginTop:4}}>+ Alt adım ekle</button>
+            <div style={{display:"flex",gap:8,marginTop:12}}>
+              <Bt onClick={()=>{const n=document.getElementById("hn").value;if(!n)return;const subs=hNewSubs.filter(s=>s.trim()).map(s=>({id:uid(),name:s.trim()}));sHb(p=>[...p,{id:uid(),name:n,goal:document.getElementById("hg").value,type:subs.length?"subs":"check",days:+document.getElementById("hd").value||30,time:document.getElementById("ht").value||"08:00",reminder:true,subs,log:{}}]);sShf(false);sHNewSubs([])}} style={{flex:1}}>Kaydet</Bt>
+              <SB2 onClick={()=>{sShf(false);sHNewSubs([])}} style={{flex:1}}>İptal</SB2></div></Cd>:
+          <Bt onClick={()=>sShf(true)}>+ Yeni Alışkanlık</Bt>}</div>}
+        {hTab===1&&<div><div style={{fontSize:16,fontWeight:700,marginBottom:12,color:"#fff"}}>Haftalık İstikrar</div>
+          {hb.map(h=>{const pct=gWP(h);const w=wkDates(new Date());const streak=getStreak(h);
+            return<Cd key={h.id}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div><div style={{fontSize:15,fontWeight:700,color:"#ddd"}}>{h.name}</div><div style={{fontSize:11,color:"#666"}}>{h.goal}{streak>0&&<span style={{color:"#FFB800",marginLeft:8}}>🔥 {streak} gün</span>}</div></div>
+              <div style={{fontSize:22,fontWeight:900,color:pct>=70?"#00C896":pct>=40?"#FFB800":"#FF3B5C"}}>%{pct}</div></div>
+              <div style={{display:"flex",gap:4,marginBottom:10}}>{w.map(d=>{const s=gHS(h,dkf(d));const iT2=sameDay(d,NOW);
+                return<div key={dkf(d)} style={{flex:1,textAlign:"center"}}><div style={{fontSize:10,color:iT2?ACC:"#555",fontWeight:iT2?700:400,marginBottom:3}}>{DS[(d.getDay()+6)%7]}</div>
+                  <div style={{width:26,height:26,borderRadius:8,margin:"0 auto",background:SBG[s],color:SC[s],display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,border:iT2?`2px solid ${ACC}`:"none"}}>{SI[s]}</div></div>})}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.06)"}}><div style={{height:6,borderRadius:3,background:pct>=70?"#00C896":"#FFB800",width:`${pct}%`}}/></div></div></Cd>})}</div>}
+        {hTab===2&&<div>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:6,color:"#fff"}}>😴 Uyku Takibi</div>
+          <div style={{fontSize:12,color:"#666",marginBottom:12}}>Hedef: {slpCfg.bedTarget} yat → {slpCfg.wakeTarget} kalk</div>
+          {slp.length>=2&&<MiniChart data={slp.slice(0,14).reverse().map(s=>({v:s.score}))} color="#8E24AA" title="Uyku Puanı" labels={slp.slice(0,14).reverse().map(s=>s.date?.slice(8))}/>}
+          {slpF?<Cd>
+            <Lb>Yatış saati (gerçek)</Lb><In id="slpBed" type="time" defaultValue={todaySlp?.bed||slpCfg.bedTarget}/>
+            <Lb>Kalkış saati (gerçek)</Lb><In id="slpWake" type="time" defaultValue={todaySlp?.wake||slpCfg.wakeTarget}/>
+            <Lb>Puan (0-100)</Lb>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><In id="slpScore" type="number" defaultValue={todaySlp?.score||70} min="0" max="100" style={{width:80}}/><input type="range" min="0" max="100" defaultValue={todaySlp?.score||70} onChange={e=>{const inp=document.getElementById("slpScore");if(inp)inp.value=e.target.value}} style={{flex:1,accentColor:"#8E24AA"}}/></div>
+            <Lb>Not</Lb><In id="slpNote" placeholder="Nasıl hissettin?" defaultValue={todaySlp?.note||""}/>
+            <div style={{display:"flex",gap:8,marginTop:12}}>
+              <Bt bg="#8E24AA" onClick={()=>{const bed=document.getElementById("slpBed").value;const wake=document.getElementById("slpWake").value;const score=Math.min(100,Math.max(0,+document.getElementById("slpScore").value||0));const note=document.getElementById("slpNote").value;const hrs=calcSleepHrs(bed,wake);const bedDev=sleepDeviation(bed,slpCfg.bedTarget);const wakeDev=sleepDeviation(wake,slpCfg.wakeTarget);
+                sSlp(p=>{const f=p.filter(s=>s.date!==TK);return[{date:TK,bed,wake,score,note,hrs,bedDev,wakeDev},...f]});sSlpF(false)}} style={{flex:1}}>Kaydet</Bt>
+              <SB2 onClick={()=>sSlpF(false)} style={{flex:1}}>İptal</SB2></div></Cd>:
+          <Bt onClick={()=>sSlpF(true)} bg="#8E24AA">+ Uyku Kaydı {todaySlp?"(Güncelle)":"Ekle"}</Bt>}
+          <div style={{marginTop:12}}>{slp.slice(0,14).map((s,i)=>{const sc=s.score>=70?"#00C896":s.score>=40?"#FFB800":"#FF3B5C";const hrs=s.hrs||calcSleepHrs(s.bed,s.wake);
+            const bedDev2=sleepDeviation(s.bed,slpCfg.bedTarget);const wakeDev2=sleepDeviation(s.wake,slpCfg.wakeTarget);
+            return<Cd key={i} style={{borderLeft:`3px solid ${sc}`,padding:"10px 14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{s.date}</div>
+                  <div style={{fontSize:11,color:"#666"}}>{s.bed} → {s.wake} • {hrs}sa</div>
+                  {(bedDev2>30||wakeDev2>30)&&<div style={{fontSize:10,color:"#FF6B35",marginTop:2}}>{bedDev2>30?`Yatış ${bedDev2}dk sapma`:""}{bedDev2>30&&wakeDev2>30?" • ":""}{wakeDev2>30?`Kalkış ${wakeDev2}dk sapma`:""}</div>}
+                  {s.note&&<div style={{fontSize:11,color:"#555",marginTop:2}}>{s.note}</div>}</div>
+                <div style={{fontSize:22,fontWeight:900,color:sc}}>{s.score}</div></div>
+              <div style={{height:4,borderRadius:2,background:"rgba(255,255,255,0.06)",marginTop:6}}><div style={{height:4,borderRadius:2,background:sc,width:`${s.score}%`}}/></div></Cd>})}</div></div>}
+        {hTab===3&&<div><div style={{fontSize:16,fontWeight:700,marginBottom:12,color:"#fff"}}>📚 Kitaplar</div>
+          {bV!==null?(()=>{const b=bk[bV];if(!b)return null;
+            return<div><button onClick={()=>{sBV(null);sBlf(false)}} style={{background:"none",border:"none",color:ACC,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>← Geri</button>
+              <Cd><div style={{fontSize:17,fontWeight:700,color:"#fff"}}>{b.title}</div><div style={{fontSize:13,color:"#666"}}>{b.author} • {b.totalPages} sayfa</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}><div style={{flex:1,height:8,borderRadius:4,background:"rgba(255,255,255,0.06)"}}><div style={{height:8,borderRadius:4,background:ACC,width:`${Math.round(b.currentPage/b.totalPages*100)}%`}}/></div><span style={{fontSize:12,fontWeight:700,color:"#ccc"}}>s.{b.currentPage}/{b.totalPages}</span></div></Cd>
+              {blf?<Cd><Lb>Sayfalar</Lb><In value={nlp} onChange={e=>sNlp(e.target.value)} placeholder="180-200"/><Lb>Not</Lb><In value={nln} onChange={e=>sNln(e.target.value)} placeholder="Notlar..."/>
+                <div style={{display:"flex",gap:8,marginTop:10}}><Bt onClick={()=>{if(!nlp)return;const nb=[...bk];const pg=nlp.split("-");const lp=parseInt(pg[pg.length-1])||b.currentPage;nb[bV]={...b,currentPage:lp,endDate:lp>=b.totalPages?dkf(new Date()):"",logs:[{date:dkf(new Date()),pages:nlp,note:nln},...b.logs]};sBk(nb);sBlf(false);sNlp("");sNln("")}} style={{flex:1}}>Kaydet</Bt><SB2 onClick={()=>sBlf(false)} style={{flex:1}}>İptal</SB2></div></Cd>:
+              <Bt onClick={()=>sBlf(true)}>📖 Okuma Kaydı</Bt>}
+              <div style={{marginTop:14,fontSize:14,fontWeight:700,marginBottom:8,color:"#888"}}>Günlük</div>
+              {b.logs.map((l,i)=><Cd key={i} style={{padding:"10px 14px"}}><div style={{fontSize:12,color:"#555"}}>{l.date}</div><div style={{fontSize:13,fontWeight:600,color:"#ccc"}}>Sayfa: {l.pages}</div>{l.note&&<div style={{fontSize:12,color:"#777",marginTop:4}}>{l.note}</div>}</Cd>)}</div>})():
+          <div>{bk.map((b,i)=>{const pct=Math.round(b.currentPage/b.totalPages*100);
+            return<Cd key={b.id} style={{cursor:"pointer"}} onClick={()=>sBV(i)}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>{b.title}</div><div style={{fontSize:12,color:"#666"}}>{b.author}</div></div><span style={{fontSize:12,fontWeight:700,color:pct>=100?"#00C896":ACC}}>{pct}%</span></div>
+              <div style={{height:6,borderRadius:3,background:"rgba(255,255,255,0.06)",marginTop:8}}><div style={{height:6,borderRadius:3,background:pct>=100?"#00C896":ACC,width:`${pct}%`}}/></div></Cd>})}
+          <Bt onClick={()=>{sBk(p=>[...p,{id:uid(),title:"Yeni Kitap",author:"",totalPages:300,currentPage:0,startDate:dkf(new Date()),endDate:"",logs:[]}]);sBV(bk.length)}}>+ Kitap Ekle</Bt></div>}</div>}
+      </div>)}
+      {/* İŞ */}
+      {mt===3&&(<div style={{animation:"fadeIn 0.3s ease"}}>
+        <div style={{display:"flex",gap:4,marginBottom:12}}>{[{i:"📋",l:"Genel"},{i:"📅",l:"Takvim"},{i:"📊",l:"Tümü"},{i:"📝",l:"Notlar"}].map((ic,i)=><button key={i} onClick={()=>{sWV(["main","calendar","all","notes"][i]);sPI(null);sXT(null)}} style={{flex:1,padding:"8px 4px",fontSize:11,fontWeight:(wV===["main","calendar","all","notes"][i]||(wV==="project"&&i===0))?700:400,color:(wV===["main","calendar","all","notes"][i]||(wV==="project"&&i===0))?ACC:"#666",background:(wV===["main","calendar","all","notes"][i]||(wV==="project"&&i===0))?"rgba(124,92,252,0.12)":"rgba(255,255,255,0.03)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit"}}>{ic.i}<br/><span style={{fontSize:9}}>{ic.l}</span></button>)}</div>
+        {wV==="main"&&<div>
+          {oT.length>0&&<Cd style={{background:"rgba(255,59,92,0.08)",border:"1px solid rgba(255,59,92,0.15)"}}><div style={{fontSize:14,fontWeight:700,color:"#FF3B5C"}}>⚠️ {oT.length} gecikmiş</div>{oT.slice(0,3).map(t=><div key={t.id} style={{fontSize:12,color:"#FF6B7A",padding:"2px 0"}}>• {t.title}</div>)}</Cd>}
+          <div style={{fontSize:16,fontWeight:700,margin:"12px 0 10px",color:"#fff"}}>Projeler</div>
+          {pj.map((p,i)=>{const dn=p.tasks.filter(t=>t.done).length,tot=p.tasks.length,pct=tot?Math.round(dn/tot*100):0;
+            return<Cd key={p.id} style={{borderLeft:`3px solid ${p.color}`,cursor:"pointer"}} onClick={()=>{sPI(i);sWV("project")}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{p.name}</div><div style={{fontSize:12,color:"#666"}}>{tot} görev</div></div><div style={{fontSize:20,fontWeight:900,color:pct===100?"#00C896":p.color}}>{pct}%</div></div>
+              <div style={{height:6,borderRadius:3,background:"rgba(255,255,255,0.06)",marginTop:8}}><div style={{height:6,borderRadius:3,background:pct===100?"#00C896":p.color,width:`${pct}%`}}/></div></Cd>})}
+          <Bt onClick={()=>{sPj(p=>[...p,{id:uid(),name:"Yeni Proje",color:COLORS[pj.length%COLORS.length],tasks:[]}]);sPI(pj.length);sWV("project")}}>+ Yeni Proje</Bt></div>}
+        {wV==="project"&&pI!==null&&(()=>{const p=pj[pI];if(!p)return null;const dn=p.tasks.filter(t=>t.done).length,pct=p.tasks.length?Math.round(dn/p.tasks.length*100):0;
+          const sorted=soT(p.tasks.map((t,i)=>({...t,origIdx:i}))),filtered=fiT(sorted);
+          return<div>
+            <button onClick={()=>{sWV("main");sPI(null);sXT(null)}} style={{background:"none",border:"none",color:ACC,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>← Projeler</button>
+            <Cd style={{borderLeft:`3px solid ${p.color}`}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{p.name}</div><div style={{fontSize:12,color:"#666"}}>{p.tasks.length} görev • {dn} bitti</div></div><div style={{fontSize:24,fontWeight:900,color:pct===100?"#00C896":p.color}}>{pct}%</div></div>
+              <div style={{height:8,borderRadius:4,background:"rgba(255,255,255,0.06)",marginTop:10}}><div style={{height:8,borderRadius:4,background:pct===100?"#00C896":p.color,width:`${pct}%`}}/></div></Cd>
+            <div style={{fontSize:14,fontWeight:700,margin:"10px 0 8px",color:"#888"}}>📝 Notlar</div>
+            <Cd style={{padding:"10px 14px"}}><div style={{display:"flex",gap:8}}><In id="pnt" placeholder="Not başlığı..." style={{flex:1}}/><button onClick={()=>{const t=document.getElementById("pnt").value;if(!t)return;addN({id:uid(),title:t,projectId:p.id,priority:3,createdAt:tn(),blocks:[{id:uid(),type:"text",content:""}]});document.getElementById("pnt").value=""}} style={{padding:"10px 16px",background:ACC,color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+</button></div></Cd>
+            {pNt(p.id).map(n=><div key={n.id} onClick={()=>sON(n.id)} style={{padding:"10px 14px",background:"#1a1a24",borderRadius:12,marginBottom:6,borderLeft:`3px solid ${p.color}`,cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)"}}><div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>{n.title}</div></div>)}
+            <div style={{fontSize:14,fontWeight:700,margin:"14px 0 8px",color:"#888"}}>📋 Görevler</div>
+            <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}><Pill bg={ACC} active={tS==="priority"} onClick={()=>sTS("priority")}>Önem</Pill><Pill bg={ACC} active={tS==="date"} onClick={()=>sTS("date")}>Tarih</Pill><Pill bg="#555" active={tF==="active"} onClick={()=>sTF("active")}>Aktif</Pill><Pill bg="#555" active={tF==="all"} onClick={()=>sTF("all")}>Tümü</Pill></div>
+            {filtered.map(t=>{const ov=!t.done&&t.end<TK;
+              return<Cd key={t.id} style={{borderLeft:`3px solid ${t.done?"#333":ov?PC[1]:PC[t.priority]}`,padding:0,overflow:"hidden"}}>
+                <div style={{padding:"12px 14px",cursor:"pointer"}} onClick={()=>sXT(xT===t.id?null:t.id)}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                    <button onClick={e=>{e.stopPropagation();uT(pI,t.origIdx,{done:!t.done})}} style={{width:24,height:24,borderRadius:8,border:t.done?"none":"2px solid #444",background:t.done?"#00C896":"transparent",color:"#fff",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>{t.done?"✓":""}</button>
+                    <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,textDecoration:t.done?"line-through":"none",color:t.done?"#555":"#ddd"}}>{t.title}</div>
+                      <div style={{fontSize:11,color:"#555",marginTop:4}}>{PL[t.priority]} • {t.start}→{t.end}{t.subtasks?.length>0&&<span style={{marginLeft:8}}>📋 {t.subtasks.filter(s=>s.done).length}/{t.subtasks.length}</span>}</div></div>
+                    <span style={{color:"#444",fontSize:14}}>{xT===t.id?"▼":"›"}</span></div></div>
+                {xT===t.id&&<div style={{borderTop:"1px solid rgba(255,255,255,0.04)",padding:"12px 14px",background:"rgba(255,255,255,0.02)"}}>
+                  {t.notes&&<div style={{fontSize:13,color:"#888",marginBottom:8,background:"rgba(255,255,255,0.03)",padding:10,borderRadius:8}}>{t.notes}</div>}
+                  {t.subtasks?.length>0&&<div style={{marginBottom:8}}>{t.subtasks.map(sub=><div key={sub.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                    <button onClick={()=>tgS(pI,t.origIdx,sub.id)} style={{width:18,height:18,borderRadius:5,border:sub.done?"none":"2px solid #444",background:sub.done?"#00C896":"transparent",color:"#fff",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>{sub.done?"✓":""}</button>
+                    <span style={{fontSize:12,color:sub.done?"#555":"#ccc",textDecoration:sub.done?"line-through":"none"}}>{sub.text}</span></div>)}</div>}
+                  <div style={{display:"flex",gap:6}}><button onClick={()=>{const t2=prompt("Alt görev:");if(t2)aS(pI,t.origIdx,t2)}} style={{padding:"6px 12px",background:"rgba(255,255,255,0.06)",border:"none",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit",color:"#aaa"}}>+ Alt görev</button>
+                    <button onClick={()=>dT(pI,t.origIdx)} style={{padding:"6px 12px",background:"rgba(255,59,92,0.1)",border:"none",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit",color:"#FF3B5C"}}>🗑️</button></div></div>}</Cd>})}
+            <Bt onClick={()=>{const t=prompt("Görev başlığı:");if(!t)return;sPj(p=>p.map((pp,i)=>i===pI?{...pp,tasks:[...pp.tasks,{id:uid(),title:t,priority:3,start:TK,end:dkf(new Date(Date.now()+7*86400000)),done:false,notes:"",subtasks:[]}]}:pp))}}>+ Yeni Görev</Bt></div>})()}
+        {wV==="calendar"&&<div><Cal selected={wCD} onSelect={d=>sWCD(d)} dotsFn={d=>{const k=dkf(d);const cs=[];pj.forEach(p=>{if(p.tasks.some(t=>!t.done&&t.start<=k&&t.end>=k)&&!cs.includes(p.color))cs.push(p.color)});return cs}}/>
+          {(()=>{const k=dkf(wCD),dt=aT.filter(t=>!t.done&&t.start<=k&&t.end>=k);if(!dt.length)return<Cd style={{textAlign:"center",padding:24,color:"#444"}}>Görev yok</Cd>;
+            return dt.map(t=><Cd key={t.id} style={{borderLeft:`3px solid ${t.projColor}`,padding:"10px 14px"}}><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{t.title}</div><div style={{fontSize:11,color:"#666"}}>{t.projName}</div></Cd>)})()}</div>}
+        {wV==="all"&&<div><div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}><Pill bg={ACC} active={tS==="priority"} onClick={()=>sTS("priority")}>Önem</Pill><Pill bg={ACC} active={tS==="date"} onClick={()=>sTS("date")}>Tarih</Pill><Pill bg="#555" active={tF==="active"} onClick={()=>sTF("active")}>Aktif</Pill><Pill bg="#555" active={tF==="all"} onClick={()=>sTF("all")}>Tümü</Pill></div>
+          {fiT(soT(aT)).map(t=><Cd key={t.id} style={{borderLeft:`3px solid ${t.projColor}`,padding:"10px 14px"}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{t.title}</div><div style={{fontSize:11,color:"#666"}}>{t.projName}</div></div><div style={{fontSize:11,color:"#555"}}>{t.end}</div></div></Cd>)}</div>}
+        {wV==="notes"&&<div><Cd style={{padding:"10px 14px"}}><div style={{display:"flex",gap:8}}><In id="qn" placeholder="Not başlığı..." style={{flex:1}}/><button onClick={()=>{const t=document.getElementById("qn").value;if(!t)return;addN({id:uid(),title:t,projectId:null,priority:3,createdAt:tn(),blocks:[{id:uid(),type:"text",content:""}]});document.getElementById("qn").value=""}} style={{padding:"10px 16px",background:ACC,color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+</button></div></Cd>
+          {nt.map(n=>{const pr=pj.find(p=>p.id===n.projectId);return<div key={n.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:"#1a1a24",borderRadius:12,marginBottom:6,borderLeft:`3px solid ${pr?.color||"#333"}`,cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{flex:1}} onClick={()=>sON(n.id)}><div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>{n.title}</div></div>
+              <button onClick={()=>delN(n.id)} style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:14}}>✕</button></div>})}</div>}
+      </div>)}
+      {/* FİNANS */}
+      {mt===4&&(<div style={{animation:"fadeIn 0.3s ease"}}>
+        <div style={{display:"flex",gap:4,marginBottom:12}}>{["📊 Özet","📝 Harcamalar","💳 Ödemeler"].map((t,i)=><button key={i} onClick={()=>sFTab(i)} style={{flex:1,padding:"8px 4px",fontSize:10,fontWeight:fTab===i?700:400,color:fTab===i?ACC:"#666",background:fTab===i?"rgba(124,92,252,0.12)":"rgba(255,255,255,0.03)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit"}}>{t}</button>)}</div>
+        {fTab===0&&<div>
+          <Cd style={{background:"linear-gradient(135deg,rgba(255,59,92,0.15),rgba(255,59,92,0.05))"}}><div style={{fontSize:12,color:"#FF6B7A"}}>Bu Ay Toplam</div><div style={{fontSize:32,fontWeight:900,color:"#FF3B5C"}}>₺{tMo.toLocaleString("tr-TR")}</div></Cd>
+          {bCat.map(([c,a])=>{const pct=tMo?Math.round(a/tMo*100):0;return<Cd key={c}><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{c}</span><span style={{fontSize:13,fontWeight:700,color:"#fff"}}>₺{a.toLocaleString("tr-TR")}</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.06)"}}><div style={{height:6,borderRadius:3,background:ACC,width:`${pct}%`}}/></div><span style={{fontSize:11,color:"#555"}}>{pct}%</span></div></Cd>})}</div>}
+        {fTab===1&&<div>
+          {ef?<Cd><Lb>Tutar (₺)</Lb><In type="number" value={ne.amount} onChange={e=>sNe(p=>({...p,amount:e.target.value}))} placeholder="0"/>
+            <Lb>Kategori</Lb><div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+              {cats.map(c=><Pill key={c} bg={ACC} active={ne.cat===c} onClick={()=>sNe(p=>({...p,cat:c}))}>{c}</Pill>)}
+              <Pill bg="#FFB800" active={false} onClick={()=>{const nc=prompt("Yeni kategori adı:");if(nc&&nc.trim()&&!cats.includes(nc.trim())){sCats(p=>[...p,nc.trim()]);sNe(p=>({...p,cat:nc.trim()}))}}}>+ Yeni</Pill></div>
+            <Lb>Not</Lb><In value={ne.note} onChange={e=>sNe(p=>({...p,note:e.target.value}))} placeholder="Açıklama..."/>
+            <div style={{display:"flex",gap:8,marginTop:12}}><Bt onClick={()=>{if(!ne.amount)return;sExp(p=>[{id:uid(),date:TK,amount:+ne.amount,cat:ne.cat,note:ne.note},...p]);sNe({amount:"",cat:cats[0]||"Diğer",note:""});sEf(false)}} style={{flex:1}}>Kaydet</Bt><SB2 onClick={()=>sEf(false)} style={{flex:1}}>İptal</SB2></div></Cd>:
+          <Bt onClick={()=>sEf(true)}>+ Harcama Ekle</Bt>}
+          <div style={{marginTop:12}}>{exp.slice(0,30).map((e,i)=><Cd key={e.id||i} style={{padding:"10px 14px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:"#ddd"}}>{e.cat}</div><div style={{fontSize:11,color:"#555"}}>{e.date}{e.note&&(" • "+e.note)}</div></div><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontSize:15,fontWeight:800,color:"#FF3B5C"}}>₺{e.amount}</div><button onClick={()=>{const na=prompt("Tutar:",e.amount);if(na===null)return;const nn=prompt("Not:",e.note||"");if(nn===null)return;sExp(p=>p.map((x,j)=>j===i?{...x,amount:+na,note:nn}:x))}} style={{background:"rgba(124,92,252,0.1)",color:ACC,border:"none",borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:11}}>✎</button><button onClick={()=>{if(confirm("Sil?"))sExp(p=>p.filter((_,j)=>j!==i))}} style={{background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:11}}>✕</button></div></div></Cd>)}</div></div>}
+        {fTab===2&&<div>
+          {pf?<Cd><Lb>Ad</Lb><In id="pn" placeholder="Ödeme adı"/><Lb>Tutar (₺)</Lb><In id="pa" type="number" placeholder="0"/><Lb>Gün</Lb><In id="pd" type="number" placeholder="1" defaultValue="1"/><Lb>Kategori</Lb><In id="pc" placeholder="Faturalar" defaultValue="Faturalar"/>
+            <div style={{display:"flex",gap:8,marginTop:12}}><Bt onClick={()=>{const n=document.getElementById("pn").value;if(!n)return;sPay(p=>[...p,{id:uid(),name:n,amount:+document.getElementById("pa").value,day:+document.getElementById("pd").value,cat:document.getElementById("pc").value}]);sPf(false)}} style={{flex:1}}>Kaydet</Bt><SB2 onClick={()=>sPf(false)} style={{flex:1}}>İptal</SB2></div></Cd>:
+          <Bt onClick={()=>sPf(true)}>+ Ödeme Planı</Bt>}
+          <div style={{marginTop:12}}>{pay.map((p,i)=><Cd key={p.id} style={{padding:"10px 14px"}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:14,fontWeight:600,color:"#ddd"}}>{p.name}</div><div style={{fontSize:11,color:"#555"}}>Her ayın {p.day}. günü</div></div><div style={{fontSize:16,fontWeight:800,color:"#FFB800"}}>₺{p.amount.toLocaleString("tr-TR")}</div></div></Cd>)}</div></div>}
+      </div>)}
+      {/* AYARLAR */}
+      {mt===5&&(<div style={{animation:"fadeIn 0.3s ease"}}>
+        <div style={{fontSize:20,fontWeight:900,marginBottom:14,color:"#fff"}}>⚙️ Ayarlar</div>
+        {!stS?(<div>
+          {[{k:"workout",i:"🏋️",t:"Antrenman Programı",d:"Grup, hareket, sıralama"},
+            {k:"habits",i:"🎯",t:"Alışkanlıklar",d:"Düzenle, alt adım ekle"},
+            {k:"water",i:"💧",t:"Su Takibi",d:"Adım ve hedef ayarla"},
+            {k:"sleep",i:"😴",t:"Uyku Hedefi",d:"Yatış: "+slpCfg.bedTarget+" Kalkış: "+slpCfg.wakeTarget},
+            {k:"books",i:"📚",t:"Kitaplar",d:"Kitap bilgileri düzenle"},
+            {k:"finance",i:"💰",t:"Finans",d:"Kategoriler ve ödemeler"},
+            {k:"general",i:"🔧",t:"Genel",d:"Bildirimler, veri yönetimi"}
+          ].map(s=>(
+            <Cd key={s.k} style={{cursor:"pointer"}} onClick={()=>sStS(s.k)}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:24}}>{s.i}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>{s.t}</div>
+                  <div style={{fontSize:12,color:"#555"}}>{s.d}</div>
+                </div>
+                <span style={{color:"#444"}}>›</span>
+              </div>
+            </Cd>
+          ))}
+        </div>):(
+        <div>
+          <button onClick={()=>{sStS(null);sEW(null)}} style={{background:"none",border:"none",color:ACC,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>← Ayarlar</button>
+
+          {stS==="workout"&&(<div>
+            {!eW?(<div>
+              {Object.entries(wk).map(([gk,g])=>(
+                <Cd key={gk} style={{borderLeft:"3px solid "+g.color,cursor:"pointer"}} onClick={()=>sEW(gk)}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{g.name}</div>
+                  <div style={{fontSize:12,color:"#555"}}>{g.exercises.length} hareket • {g.schedule.map(d=>DS[(d+6)%7]).join(", ")}</div>
+                </Cd>
+              ))}
+              <Bt onClick={()=>{const k=uid();sWk(p=>({...p,[k]:{name:"Yeni Grup",color:COLORS[Object.keys(wk).length%COLORS.length],schedule:[],exercises:[]}}));sEW(k)}}>+ Yeni Grup</Bt>
+            </div>):(()=>{const g=wk[eW];if(!g)return null;return(
+              <div>
+                <button onClick={()=>sEW(null)} style={{background:"none",border:"none",color:ACC,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>← Gruplar</button>
+                <Cd>
+                  <Lb>Grup Adı</Lb><In value={g.name} onChange={e=>{const nw={...wk};nw[eW]={...g,name:e.target.value};sWk(nw)}}/>
+                  <Lb>Renk</Lb><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{COLORS.map(c=><div key={c} onClick={()=>{const nw={...wk};nw[eW]={...g,color:c};sWk(nw)}} style={{width:28,height:28,borderRadius:8,background:c,cursor:"pointer",border:g.color===c?"3px solid #fff":"none"}}/>)}</div>
+                  <Lb>Program</Lb><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{DS.map((d,i)=>{const jd=(i+1)%7;return<Pill key={i} bg={g.color} active={g.schedule.includes(jd)} onClick={()=>{const nw={...wk};const ns=g.schedule.includes(jd)?g.schedule.filter(x=>x!==jd):[...g.schedule,jd].sort();nw[eW]={...g,schedule:ns};sWk(nw)}}>{d}</Pill>})}</div>
+                </Cd>
+                <div style={{fontSize:14,fontWeight:700,margin:"14px 0 8px",color:"#888"}}>Hareketler</div>
+                {g.exercises.map((ex,ei)=>(
+                  <Cd key={ex.id} style={{padding:"10px 14px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                        <NB onClick={()=>moveEx(eW,ei,ei-1)} style={{width:24,height:24,fontSize:10}}>▲</NB>
+                        <NB onClick={()=>moveEx(eW,ei,ei+1)} style={{width:24,height:24,fontSize:10}}>▼</NB>
+                      </div>
+                      <In value={ex.name} style={{flex:1}} onChange={e=>{const nw={...wk};const exs=[...g.exercises];exs[ei]={...ex,name:e.target.value};nw[eW]={...g,exercises:exs};sWk(nw)}}/>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <div style={{flex:1}}><Lb>Set</Lb><In type="number" value={ex.sets} onChange={e=>{const nw={...wk};const exs=[...g.exercises];exs[ei]={...ex,sets:+e.target.value};nw[eW]={...g,exercises:exs};sWk(nw)}}/></div>
+                      <div style={{flex:1}}><Lb>Tekrar</Lb><In type="number" value={ex.reps} onChange={e=>{const nw={...wk};const exs=[...g.exercises];exs[ei]={...ex,reps:+e.target.value};nw[eW]={...g,exercises:exs};sWk(nw)}}/></div>
+                      <div style={{flex:1}}><Lb>Kg</Lb><In type="number" step="0.5" value={ex.kg} onChange={e=>{const nw={...wk};const exs=[...g.exercises];exs[ei]={...ex,kg:+e.target.value};nw[eW]={...g,exercises:exs};sWk(nw)}}/></div>
+                    </div>
+                    <button onClick={()=>{const nw={...wk};nw[eW]={...g,exercises:g.exercises.filter((_,j)=>j!==ei)};sWk(nw)}} style={{marginTop:8,background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Sil</button>
+                  </Cd>
+                ))}
+                <Bt onClick={()=>{const nw={...wk};nw[eW]={...g,exercises:[...g.exercises,{id:uid(),name:"Yeni Hareket",sets:3,reps:12,kg:10}]};sWk(nw)}}>+ Hareket Ekle</Bt>
+                <SB2 onClick={()=>{if(!confirm("Grubu sil?"))return;const nw={...wk};delete nw[eW];sWk(nw);sEW(null)}} style={{color:"#FF3B5C",borderColor:"rgba(255,59,92,0.3)"}}>Grubu Sil</SB2>
+              </div>
+            )})()}
+          </div>)}
+
+          {stS==="habits"&&(<div>
+            {hb.filter(h=>h.type!=="water").map((h)=>{const i=hb.indexOf(h);return(
+              <Cd key={h.id}>
+                <Lb>Ad</Lb><In value={h.name} onChange={e=>{const nh=[...hb];nh[i]={...h,name:e.target.value};sHb(nh)}}/>
+                <Lb>Hedef</Lb><In value={h.goal||""} onChange={e=>{const nh=[...hb];nh[i]={...h,goal:e.target.value};sHb(nh)}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <div style={{flex:1}}><Lb>Saat</Lb><In type="time" value={h.time} onChange={e=>{const nh=[...hb];nh[i]={...h,time:e.target.value};sHb(nh)}}/></div>
+                  <div style={{flex:1}}><Lb>Gün</Lb><In type="number" value={h.days} onChange={e=>{const nh=[...hb];nh[i]={...h,days:+e.target.value};sHb(nh)}}/></div>
+                </div>
+                {h.subs&&h.subs.length>0&&(<div>
+                  <Lb>Alt adımlar</Lb>
+                  {h.subs.map((sub,si)=>(
+                    <div key={sub.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:11,color:"#555",width:18}}>{si+1}.</span>
+                      <In value={sub.name} style={{flex:1}} onChange={e=>{const nh=[...hb];nh[i]={...h,subs:h.subs.map((s,j)=>j===si?{...s,name:e.target.value}:s)};sHb(nh)}}/>
+                      <button onClick={()=>{const nh=[...hb];nh[i]={...h,subs:h.subs.filter((_,j)=>j!==si)};sHb(nh)}} style={{background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:6,width:24,height:24,cursor:"pointer",fontSize:10,flexShrink:0}}>✕</button>
+                    </div>
+                  ))}
+                  <button onClick={()=>{const nh=[...hb];nh[i]={...h,subs:[...h.subs,{id:uid(),name:""}]};sHb(nh)}} style={{background:"none",border:"none",color:ACC,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,marginTop:4}}>+ Alt adım</button>
+                </div>)}
+                {(!h.subs||h.subs.length===0)&&h.type!=="water"&&(<button onClick={()=>{const nh=[...hb];nh[i]={...h,subs:[{id:uid(),name:""}],type:"subs"};sHb(nh)}} style={{background:"none",border:"none",color:ACC,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,marginTop:8}}>+ Alt adım ekle</button>)}
+                <button onClick={()=>{if(!confirm("Sil?"))return;sHb(p=>p.filter(x=>x.id!==h.id))}} style={{marginTop:8,background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Sil</button>
+              </Cd>
+            )})}
+            <Bt onClick={()=>{sHb(p=>[...p,{id:uid(),name:"Yeni Alışkanlık",goal:"",type:"check",days:30,time:"08:00",reminder:true,subs:[],log:{}}])}}>+ Yeni Alışkanlık</Bt>
+          </div>)}
+
+          {stS==="water"&&(<div>
+            {hb.filter(h=>h.type==="water").map((h)=>{const i=hb.indexOf(h);return(
+              <Cd key={h.id}>
+                <Lb>Ad</Lb><In value={h.name} onChange={e=>{const nh=[...hb];nh[i]={...h,name:e.target.value};sHb(nh)}}/>
+                <Lb>Günlük hedef (ml)</Lb><In type="number" value={h.waterTarget||3000} onChange={e=>{const nh=[...hb];nh[i]={...h,waterTarget:+e.target.value};sHb(nh)}}/>
+                <Lb>Su adımları (ml)</Lb>
+                <div>{(h.waterSteps||[200,500]).map((ml,mi)=>(
+                  <div key={mi} style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                    <MI type="number" value={ml} style={{width:64}} onChange={e=>{const nh=[...hb];const ws=[...(h.waterSteps||[200,500])];ws[mi]=+e.target.value;nh[i]={...h,waterSteps:ws};sHb(nh)}}/>
+                    <button onClick={()=>{const nh=[...hb];const ws=[...(h.waterSteps||[200,500])];ws.splice(mi,1);nh[i]={...h,waterSteps:ws};sHb(nh)}} style={{background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:6,width:24,height:24,cursor:"pointer",fontSize:12}}>✕</button>
+                  </div>
+                ))}</div>
+                <Pill bg="#4FC3F7" active onClick={()=>{const nh=[...hb];const ws=[...(h.waterSteps||[200,500]),250];nh[i]={...h,waterSteps:ws};sHb(nh)}}>+ Ekle</Pill>
+              </Cd>
+            )})}
+          </div>)}
+
+          {stS==="sleep"&&(<div>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>😴 Uyku Hedefi</div>
+              <Lb>Hedef yatış saati</Lb><In type="time" value={slpCfg.bedTarget} onChange={e=>sSlpCfg(p=>({...p,bedTarget:e.target.value}))}/>
+              <Lb>Hedef kalkış saati</Lb><In type="time" value={slpCfg.wakeTarget} onChange={e=>sSlpCfg(p=>({...p,wakeTarget:e.target.value}))}/>
+              <div style={{marginTop:12,padding:10,background:"rgba(124,92,252,0.08)",borderRadius:10,fontSize:12,color:"#888"}}>
+                {"Hedef uyku süresi: "+calcSleepHrs(slpCfg.bedTarget,slpCfg.wakeTarget)+" saat. Sapma 30dk üstünde uyarı gösterilir."}
+              </div>
+            </Cd>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🗑️ Uyku Verisi</div>
+              <SB2 onClick={()=>{if(confirm("Tüm uyku kayıtları silinsin mi?"))sSlp([])}} style={{color:"#FF3B5C",borderColor:"rgba(255,59,92,0.3)"}}>Uyku kayıtlarını sil</SB2>
+            </Cd>
+          </div>)}
+
+          {stS==="books"&&(<div>
+            {bk.map((b,i)=>(
+              <Cd key={b.id}>
+                <Lb>Başlık</Lb><In value={b.title} onChange={e=>{const nb=[...bk];nb[i]={...b,title:e.target.value};sBk(nb)}}/>
+                <Lb>Yazar</Lb><In value={b.author} onChange={e=>{const nb=[...bk];nb[i]={...b,author:e.target.value};sBk(nb)}}/>
+                <Lb>Toplam sayfa</Lb><In type="number" value={b.totalPages} onChange={e=>{const nb=[...bk];nb[i]={...b,totalPages:+e.target.value};sBk(nb)}}/>
+                <button onClick={()=>sBk(p=>p.filter(x=>x.id!==b.id))} style={{marginTop:8,background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Sil</button>
+              </Cd>
+            ))}
+          </div>)}
+
+          {stS==="finance"&&(<div>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:8,color:"#ddd"}}>📂 Kategoriler</div>
+            <Cd>
+              {cats.map((c,ci)=>(
+                <div key={ci} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:ci<cats.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+                  <span style={{fontSize:13,color:"#ccc",flex:1}}>{c}</span>
+                  <button onClick={()=>{if(!confirm("Sil?"))return;sCats(p=>p.filter((_,j)=>j!==ci))}} style={{background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:6,width:24,height:24,cursor:"pointer",fontSize:10}}>✕</button>
+                </div>
+              ))}
+              <button onClick={()=>{const nc=prompt("Yeni kategori:");if(nc&&nc.trim()&&!cats.includes(nc.trim()))sCats(p=>[...p,nc.trim()])}} style={{background:"none",border:"none",color:ACC,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,marginTop:8}}>+ Kategori ekle</button>
+            </Cd>
+            <div style={{fontSize:14,fontWeight:700,margin:"14px 0 8px",color:"#ddd"}}>💳 Ödeme Planları</div>
+            {pay.map((p,i)=>(
+              <Cd key={p.id}>
+                <div style={{display:"flex",gap:8}}>
+                  <div style={{flex:1}}><Lb>Ad</Lb><In value={p.name} onChange={e=>{const np=[...pay];np[i]={...p,name:e.target.value};sPay(np)}}/></div>
+                  <div style={{flex:1}}><Lb>Tutar</Lb><In type="number" value={p.amount} onChange={e=>{const np=[...pay];np[i]={...p,amount:+e.target.value};sPay(np)}}/></div>
+                </div>
+                <button onClick={()=>sPay(pp=>pp.filter(x=>x.id!==p.id))} style={{marginTop:8,background:"rgba(255,59,92,0.1)",color:"#FF3B5C",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Sil</button>
+              </Cd>
+            ))}
+          </div>)}
+
+          {stS==="general"&&(<div>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:"#ddd"}}>🏠 Ana Sayfa Modu</div>
+              <div style={{display:"flex",gap:6}}>
+                {[{k:"work",l:"💼 İş"},{k:"personal",l:"🌙 Kişisel"},{k:"all",l:"⚡ Hepsi"}].map(m=><Pill key={m.k} bg={ACC} active={homeMode===m.k} onClick={()=>sHomeMode(m.k)} style={{flex:1,textAlign:"center"}}>{m.l}</Pill>)}
+              </div>
+              <button onClick={()=>sHomeMode(null)} style={{background:"none",border:"none",color:"#666",cursor:"pointer",fontFamily:"inherit",fontSize:12,marginTop:8}}>Seçim ekranına dön</button>
+            </Cd>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:"#ddd"}}>🔔 Bildirimler</div>
+              <Bt onClick={()=>{if("Notification"in window)Notification.requestPermission().then(p=>alert(p==="granted"?"Açık!":"Reddedildi"))}}>Bildirim İzni Aç</Bt>
+            </Cd>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:"#ddd"}}>💾 Veri Yönetimi</div>
+              <div style={{fontSize:12,color:"#666",marginBottom:8}}>Tüm veriler localStorage ile kalıcı.</div>
+              <SB2 onClick={()=>{if(confirm("Antrenman kayıtları silinsin mi?")){sRec([]);alert("Silindi!")}}}>🏋️ Antrenman kayıtlarını sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Harcamalar silinsin mi?")){sExp([]);alert("Silindi!")}}}>💰 Harcamaları sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Ödeme planları silinsin mi?")){sPay([]);alert("Silindi!")}}}>💳 Ödeme planlarını sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Alışkanlık logları silinsin mi?")){sHb(p=>p.map(h=>({...h,log:{}})));alert("Loglar silindi!")}}}>🎯 Alışkanlık loglarını sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Uyku kayıtları silinsin mi?")){sSlp([]);alert("Silindi!")}}}>😴 Uyku kayıtlarını sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Vücut ölçümleri silinsin mi?")){sMs([]);alert("Silindi!")}}}>📐 Ölçümleri sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Kitap verileri silinsin mi?")){sBk([]);alert("Silindi!")}}}>📚 Kitapları sil</SB2>
+              <SB2 onClick={()=>{if(confirm("Projeler ve görevler silinsin mi?")){sPj([]);sNt([]);alert("Silindi!")}}}>💼 Proje/görevleri sil</SB2>
+              <SB2 onClick={()=>{if(confirm("⚠️ TÜM VERİLER SİLİNECEK! Emin misin?")){const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("kv2_"))keys.push(k);}keys.forEach(k=>localStorage.removeItem(k));alert("Tüm veriler silindi!");location.reload()}}} style={{color:"#FF3B5C",borderColor:"rgba(255,59,92,0.3)"}}>⚠️ Tüm verileri sıfırla</SB2>
+            </Cd>
+            <Cd style={{textAlign:"center"}}><div style={{fontSize:11,color:"#444"}}>KadirV2 v3.1</div></Cd>
+          </div>)}
+        </div>)}
+      </div>)}
+
+      </div>
+      {/* BOTTOM TAB BAR */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",background:"#13131a",borderTop:"1px solid rgba(255,255,255,0.06)",paddingBottom:"env(safe-area-inset-bottom)",zIndex:50,maxWidth:440,margin:"0 auto"}}>
+        {mainTabs.map((t,i)=>{
+          if(homeMode==="work"&&(i===1||i===2||i===4))return null;
+          if(homeMode==="personal"&&i===3)return null;
+          return<button key={i} onClick={()=>sMt(i)} style={{flex:1,padding:"8px 2px 6px",fontSize:9,fontWeight:mt===i?700:400,color:mt===i?ACC:"#555",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+          <span style={{fontSize:18}}>{t.i}</span>{t.l}
+        </button>})}
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
