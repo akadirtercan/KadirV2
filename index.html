@@ -47,15 +47,18 @@ const reqNotifPerm=()=>{if("Notification"in window&&Notification.permission==="d
 /* VOICE COMMAND SYSTEM */
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 const hasSpeech=!!SpeechRec;
-/* JARVIS VOICE - deeper, slower, confident */
-let jarvisVoice=null;
-const loadVoices=()=>{const v=speechSynthesis.getVoices();
-  jarvisVoice=v.find(x=>x.name.includes("Google UK English Male"))||v.find(x=>x.name.includes("Microsoft David"))||v.find(x=>x.name.includes("Male")&&x.lang.startsWith("en"))||v.find(x=>x.lang.startsWith("en-GB"))||v.find(x=>x.lang.startsWith("en"))||v[0]};
+/* JARVIS VOICE */
+let jarvisVoice=null;let allVoices=[];
+const loadVoices=()=>{allVoices=speechSynthesis.getVoices();
+  const saved=LS.get("voiceIdx",null);
+  if(saved!==null&&allVoices[saved]){jarvisVoice=allVoices[saved];return}
+  jarvisVoice=allVoices.find(x=>x.name.includes("Google UK English Male"))||allVoices.find(x=>x.name.includes("Microsoft David"))||allVoices.find(x=>x.lang.startsWith("en")&&x.name.toLowerCase().includes("male"))||allVoices.find(x=>x.lang.startsWith("en-GB"))||allVoices.find(x=>x.lang.startsWith("tr"))||allVoices[0]};
 if(speechSynthesis.getVoices().length)loadVoices();
 speechSynthesis.onvoiceschanged=loadVoices;
 const speak=(text)=>{try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
-  if(jarvisVoice)u.voice=jarvisVoice;u.lang=jarvisVoice?.lang||"en-US";u.rate=0.92;u.pitch=0.75;u.volume=1;
-  speechSynthesis.speak(u)}catch{}};
+  if(jarvisVoice)u.voice=jarvisVoice;u.lang=jarvisVoice?.lang||"en-US";
+  const sp=LS.get("voiceSpeed",0.92);const pt=LS.get("voicePitch",0.75);
+  u.rate=sp;u.pitch=pt;u.volume=1;speechSynthesis.speak(u)}catch{}};
 /* GROQ AI */
 const callGroq=async(messages,apiKey)=>{
   try{const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{
@@ -753,9 +756,20 @@ function App(){
               </div>
             </Cd>
             <Cd>
-              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🔊 Ses Ayarı</div>
-              <div style={{fontSize:12,color:"#888"}}>{"Ses: "+(jarvisVoice?jarvisVoice.name:"Yükleniyor...")}</div>
-              <Bt onClick={()=>speak("Merhaba Kadir. Ben JARVIS, senin kişisel asistanınım. Bugün sana nasıl yardımcı olabilirim?")}>🔊 JARVIS Sesini Test Et</Bt>
+              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🔊 Ses Ayarları</div>
+              <div style={{fontSize:12,color:"#888",marginBottom:8}}>{"Seçili: "+(jarvisVoice?jarvisVoice.name:"Yükleniyor...")}</div>
+              <div style={{maxHeight:200,overflowY:"auto",marginBottom:10,borderRadius:10,border:"1px solid rgba(255,255,255,0.06)"}}>
+                {allVoices.map((v,vi)=>(
+                  <div key={vi} onClick={()=>{jarvisVoice=allVoices[vi];LS.set("voiceIdx",vi);speak("Merhaba Kadir, bu ses nasıl?")}} style={{padding:"8px 12px",fontSize:12,color:jarvisVoice===v?"#fff":"#888",background:jarvisVoice===v?"rgba(124,92,252,0.2)":"transparent",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    {v.name} <span style={{fontSize:10,color:"#555"}}>{v.lang}</span>
+                  </div>
+                ))}
+              </div>
+              <Lb>Hız ({LS.get("voiceSpeed",0.92)})</Lb>
+              <input type="range" min="0.5" max="1.5" step="0.05" defaultValue={LS.get("voiceSpeed",0.92)} onChange={e=>LS.set("voiceSpeed",+e.target.value)} style={{width:"100%",accentColor:ACC}}/>
+              <Lb>Kalınlık ({LS.get("voicePitch",0.75)})</Lb>
+              <input type="range" min="0.3" max="1.5" step="0.05" defaultValue={LS.get("voicePitch",0.75)} onChange={e=>LS.set("voicePitch",+e.target.value)} style={{width:"100%",accentColor:ACC}}/>
+              <Bt onClick={()=>speak("Dinlenme bitti. Sıradaki: Bench Press, Set 3, 10 tekrar, 60 kilo")}>🔊 Test Et</Bt>
             </Cd>
           </div>)}
 
