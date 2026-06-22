@@ -47,36 +47,23 @@ const reqNotifPerm=()=>{if("Notification"in window&&Notification.permission==="d
 /* VOICE COMMAND SYSTEM */
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 const hasSpeech=!!SpeechRec;
-const speak=(text,jarvis=false)=>{try{const u=new SpeechSynthesisUtterance(text);u.lang="tr-TR";if(jarvis){u.rate=0.95;u.pitch=0.8;const voices=speechSynthesis.getVoices();const male=voices.find(v=>v.lang.startsWith("tr")&&v.name.toLowerCase().includes("male"))||voices.find(v=>v.lang.startsWith("tr"))||voices.find(v=>v.name.toLowerCase().includes("google")&&v.lang.startsWith("tr"));if(male)u.voice=male}else{u.rate=1.1}speechSynthesis.speak(u)}catch{}};
-const parseVoiceCmd=(text,ctx)=>{
-  const t=text.toLowerCase().trim();
-  // Su
-  if(t.includes("su")&&(t.includes("iç")||t.includes("ekle")||t.includes("kaydet"))){
-    const m=t.match(/(\d+)\s*(ml|litre)/);const ml=m?m[2]==="litre"?+m[1]*1000:+m[1]:250;
-    return{type:"water",ml,reply:"💧 "+ml+"ml su eklendi"}
-  }
-  // Harcama
-  if(t.includes("harcama")||t.includes("harcadım")||t.includes("lira")||t.includes("tl")){
-    const m=t.match(/(\d+)\s*(lira|tl)/i);const am=m?+m[1]:0;
-    const cats2=["yemek","ulaşım","market","fatura","eğlence","giyim","sağlık"];
-    const cat=cats2.find(c=>t.includes(c))||"Diğer";
-    if(am>0)return{type:"expense",amount:am,cat:cat.charAt(0).toUpperCase()+cat.slice(1),reply:"💰 "+am+"₺ "+cat+" harcaması eklendi"}
-  }
-  // Antrenman
-  if(t.includes("antrenman")||t.includes("başla")){
-    const groups=Object.entries(ctx.wk||{});
-    const found=groups.find(([k,g])=>t.includes(g.name.toLowerCase().split(" ")[0]));
-    if(found)return{type:"startWorkout",groupKey:found[0],reply:"💪 "+found[1].name+" başlıyor!"}
-  }
-  // Soru
-  if(t.includes("bu ay")||t.includes("harcama")){
-    return{type:"query",qtype:"expense",reply:"💰 Bu ay toplam: ₺"+ctx.tMo}
-  }
-  if(t.includes("bugün")){
-    return{type:"query",qtype:"today",reply:"📅 Bugün "+ctx.todayInfo}
-  }
-  return{type:"unknown",reply:"Anlamadım. Dene: 'su iç', '50 lira yemek harcadım', 'antrenman başla'"}
+/* JARVIS VOICE - deeper, slower, confident */
+let jarvisVoice=null;
+const loadVoices=()=>{const v=speechSynthesis.getVoices();
+  jarvisVoice=v.find(x=>x.name.includes("Google UK English Male"))||v.find(x=>x.name.includes("Microsoft David"))||v.find(x=>x.name.includes("Male")&&x.lang.startsWith("en"))||v.find(x=>x.lang.startsWith("en-GB"))||v.find(x=>x.lang.startsWith("en"))||v[0]};
+if(speechSynthesis.getVoices().length)loadVoices();
+speechSynthesis.onvoiceschanged=loadVoices;
+const speak=(text)=>{try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
+  if(jarvisVoice)u.voice=jarvisVoice;u.lang=jarvisVoice?.lang||"en-US";u.rate=0.92;u.pitch=0.75;u.volume=1;
+  speechSynthesis.speak(u)}catch{}};
+/* GROQ AI */
+const callGroq=async(messages,apiKey)=>{
+  try{const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},
+    body:JSON.stringify({model:"llama-3.3-70b-versatile",messages,temperature:0.7,max_tokens:500})
+  });const d=await r.json();return d.choices?.[0]?.message?.content||"Yanıt alınamadı"}catch(e){return"Bağlantı hatası: "+e.message}
 };
+const buildSystemPrompt=(ctx)=>"Sen JARVIS'sin - Kadir'in kişisel AI asistanısın. Kısa, net ve yardımcı cevaplar ver. Türkçe konuş.\n\nKadir'in güncel verileri:\n- Bugünkü antrenman: "+(ctx.todayWorkout||"Yok")+"\n- Bu ay harcama: ₺"+ctx.tMo+"\n- Su durumu: "+ctx.waterStatus+"\n- Aktif görevler: "+ctx.taskCount+"\n- Alışkanlık durumu: "+ctx.habitStatus+"\n\nKomutları algıla:\n- Su ekleme isterse JSON döndür: {\"action\":\"water\",\"ml\":250}\n- Harcama isterse: {\"action\":\"expense\",\"amount\":50,\"cat\":\"Yemek\"}\n- Antrenman başlatma: {\"action\":\"startWorkout\",\"group\":\"göğüs\"}\n- Bilgi sorusu ise normal Türkçe cevap ver.\n- Motivasyon, tavsiye, plan yapma gibi konularda da yardımcı ol.\nJSON döndürürken SADECE JSON yaz, başka bir şey yazma.";
 const DS=["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
 const MO=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const dkf=d=>{const x=d instanceof Date?d:new Date(d);return`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`};
@@ -199,7 +186,9 @@ function App(){
   // SETTINGS
   const[stS,sStS]=useState(null);const[eW,sEW]=useState(null);
   // Voice
-  const[vListen,sVListen]=useState(false);const[vText,sVText]=useState("");const[vReply,sVReply]=useState("");const[vShow,sVShow]=useState(false);
+  const[vListen,sVListen]=useState(false);const[vText,sVText]=useState("");const[vReply,sVReply]=useState("");const[vShow,sVShow]=useState(false);const[vLoading,sVLoading]=useState(false);
+  const[groqKey,sGroqKey]=useLS("groqKey","");
+  const[chatHist,sChatHist]=useState([]);
   const recRef=useRef(null);
   // Timer
   useEffect(()=>{if(!aW)return;const t=setInterval(()=>sEl(Math.floor((Date.now()-aW.startTime)/1000)),1000);return()=>clearInterval(t)},[aW]);
@@ -212,7 +201,7 @@ function App(){
   /* SPORT HELPERS */
   const gsfd=d=>{const dow=d.getDay();const r=[];Object.entries(wk).forEach(([gk,g])=>{if(g.schedule.includes(dow))r.push({gk,g})});return r};
   const startW=gk=>{const g=wk[gk];if(!g)return;const init={};g.exercises.forEach((ex,ei)=>{for(let s=1;s<=ex.sets;s++){init[`r-${ei}-${s}`]=ex.reps;init[`k-${ei}-${s}`]=ex.kg}});sEv(init);sAW({groupKey:gk,startTime:Date.now()});sCk({});sEl(0);sRk(null);sSr(true);sSTab(1)};
-  const finW=()=>{if(!aW)return;const g=wk[aW.groupKey];sRec(p=>[{dateStr:fD(new Date()),dateKey:dkf(new Date()),groupKey:aW.groupKey,name:g.name,duration:el,totalSets:g.exercises.reduce((a,e)=>a+e.sets,0),doneSets:Object.keys(ck).length},...p]);notify("✅ Antrenman Tamamlandı!",g.name+" • "+fT(el),"success");speak("Antrenman tamamlandı. "+g.name+", "+fT(el)+" sürdü. Harika iş!",true);sAW(null);sCk({});sEl(0);sRk(null);sEv({})};
+  const finW=()=>{if(!aW)return;const g=wk[aW.groupKey];sRec(p=>[{dateStr:fD(new Date()),dateKey:dkf(new Date()),groupKey:aW.groupKey,name:g.name,duration:el,totalSets:g.exercises.reduce((a,e)=>a+e.sets,0),doneSets:Object.keys(ck).length},...p]);notify("✅ Antrenman Tamamlandı!",g.name+" • "+fT(el),"success");speak("Antrenman tamamlandı. "+g.name+", "+fT(el)+" sürdü. Harika iş!");sAW(null);sCk({});sEl(0);sRk(null);sEv({})};
   const togCk=(ei,si)=>{const k=`${ei}-${si}`;const w=ck[k];sCk(p=>{const n={...p};if(w)delete n[k];else n[k]=true;return n});if(!w){sRk(`${k}-${Date.now()}`);sSr(true)}};
   const hRD=useCallback(()=>{
     if(!aW)return notify("⏱ Dinlenme Bitti!","Sonraki sete geç 💪","rest");
@@ -229,10 +218,10 @@ function App(){
       const reps=ev["r-"+(g.exercises.indexOf(nextEx))+"-"+nextSet]||nextEx.reps;
       const msg=nextEx.name+", Set "+nextSet+", "+reps+" tekrar, "+kg+" kilo";
       notify("⏱ Dinlenme Bitti!",msg,"rest");
-      speak("Dinlenme bitti. Sıradaki: "+msg,true);
+      speak("Dinlenme bitti. Sıradaki: "+msg);
     }else{
       notify("⏱ Dinlenme Bitti!","Tüm setler tamamlandı! 🎉","rest");
-      speak("Dinlenme bitti. Tüm setler tamamlandı, tebrikler!",true);
+      speak("Dinlenme bitti. Tüm setler tamamlandı, tebrikler!");
     }
   },[aW,wk,ck,ev]);
   const moveEx=(gk,from,to)=>{if(to<0)return;const nw={...wk};const exs=[...nw[gk].exercises];if(to>=exs.length)return;const[item]=exs.splice(from,1);exs.splice(to,0,item);nw[gk]={...nw[gk],exercises:exs};sWk(nw)};
@@ -264,21 +253,36 @@ function App(){
   const mExp=useMemo(()=>exp.filter(e=>e.date.startsWith(`${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,"0")}`)),[exp]);
   const tMo=mExp.reduce((a,e)=>a+e.amount,0);
   const bCat=useMemo(()=>{const m={};mExp.forEach(e=>{m[e.cat]=(m[e.cat]||0)+e.amount});return Object.entries(m).sort((a,b)=>b[1]-a[1])},[mExp]);
-  /* VOICE COMMAND */
+  /* VOICE COMMAND - GROQ AI */
+  const getContext=()=>{
+    const todayW=gsfd(NOW).map(x=>x.g.name).join(", ");
+    const wh=hb.find(h=>h.type==="water");const wCur=wh?gWT(wh):0;const wTgt=wh?(wh.waterTarget||3000):3000;
+    const habitsDone=hb.filter(h=>gHS(h,TK)==="done").length;
+    const activeT=aT.filter(t=>!t.done).length;
+    return{todayWorkout:todayW||"Dinlenme günü",tMo,waterStatus:wCur+"ml/"+wTgt+"ml",taskCount:activeT+" aktif görev",habitStatus:habitsDone+"/"+hb.length+" tamamlandı"}
+  };
+  const handleAI=async(txt)=>{
+    if(!groqKey){sVReply("⚙️ Ayarlar → AI Asistan'dan Groq API anahtarını gir");sVShow(true);return}
+    sVLoading(true);sVShow(true);sVReply("Düşünüyorum...");
+    const ctx=getContext();const sysProm=buildSystemPrompt(ctx);
+    const msgs=[{role:"system",content:sysProm},...chatHist.slice(-6),{role:"user",content:txt}];
+    const reply=await callGroq(msgs,groqKey);
+    sChatHist(p=>[...p.slice(-8),{role:"user",content:txt},{role:"assistant",content:reply}]);
+    // Check if AI returned a JSON action
+    try{const act=JSON.parse(reply);
+      if(act.action==="water"){const wh2=hb.find(h=>h.type==="water");if(wh2)addW(wh2.id,act.ml||250);sVReply("💧 "+(act.ml||250)+"ml su eklendi");speak((act.ml||250)+" millilitre su eklendi")}
+      else if(act.action==="expense"&&act.amount){sExp(p=>[{id:uid(),date:TK,amount:+act.amount,cat:act.cat||"Diğer",note:"AI"},...p]);sVReply("💰 "+act.amount+"₺ "+(act.cat||"")+" eklendi");speak(act.amount+" lira "+(act.cat||"harcama")+" eklendi")}
+      else if(act.action==="startWorkout"){const gk=Object.entries(wk).find(([k,g])=>g.name.toLowerCase().includes((act.group||"").toLowerCase()));if(gk){startW(gk[0]);sMt(1);sVReply("💪 "+gk[1].name+" başlıyor!");speak(gk[1].name+" antrenmanı başlıyor")}else{sVReply(reply);speak(reply)}}
+      else{sVReply(reply);speak(reply)}
+    }catch{sVReply(reply);speak(reply)}
+    sVLoading(false)
+  };
   const startVoice=()=>{
     if(!hasSpeech){sVReply("Tarayıcın sesli komutu desteklemiyor");sVShow(true);return}
     if(vListen){if(recRef.current)recRef.current.stop();sVListen(false);return}
     const r=new SpeechRec();r.lang="tr-TR";r.continuous=false;r.interimResults=false;
-    r.onstart=()=>sVListen(true);
-    r.onresult=e=>{const txt=e.results[0][0].transcript;sVText(txt);
-      const todayW=gsfd(NOW).map(x=>x.g.name).join(", ")||"yok";
-      const ctx={wk,tMo,todayInfo:todayW?("Antrenman: "+todayW):("Bugün dinlenme günü")};
-      const cmd=parseVoiceCmd(txt,ctx);
-      sVReply(cmd.reply);speak(cmd.reply,true);sVShow(true);
-      if(cmd.type==="water"){const wh=hb.find(h=>h.type==="water");if(wh)addW(wh.id,cmd.ml)}
-      if(cmd.type==="expense"&&cmd.amount>0){sExp(p=>[{id:uid(),date:TK,amount:cmd.amount,cat:cmd.cat,note:"Sesli komut"},...p])}
-      if(cmd.type==="startWorkout"&&cmd.groupKey){startW(cmd.groupKey);sMt(1)}
-    };
+    r.onstart=()=>{sVListen(true);sVText("");sVReply("")};
+    r.onresult=e=>{const txt=e.results[0][0].transcript;sVText(txt);handleAI(txt)};
     r.onerror=()=>{sVListen(false);sVReply("Ses algılanamadı, tekrar dene");sVShow(true)};
     r.onend=()=>sVListen(false);
     recRef.current=r;r.start()
@@ -576,6 +580,7 @@ function App(){
             {k:"sleep",i:"😴",t:"Uyku Hedefi",d:"Yatış: "+slpCfg.bedTarget+" Kalkış: "+slpCfg.wakeTarget},
             {k:"books",i:"📚",t:"Kitaplar",d:"Kitap bilgileri düzenle"},
             {k:"finance",i:"💰",t:"Finans",d:"Kategoriler ve ödemeler"},
+            {k:"ai",i:"🤖",t:"AI Asistan",d:groqKey?"✅ Bağlı":"API anahtarı gir"},
             {k:"general",i:"🔧",t:"Genel",d:"Bildirimler, veri yönetimi"}
           ].map(s=>(
             <Cd key={s.k} style={{cursor:"pointer"}} onClick={()=>sStS(s.k)}>
@@ -727,6 +732,33 @@ function App(){
             ))}
           </div>)}
 
+          {stS==="ai"&&(<div>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🤖 Groq AI Asistan</div>
+              <div style={{fontSize:12,color:"#666",marginBottom:10}}>Groq API anahtarını gir. Ücretsiz: console.groq.com</div>
+              <In type="password" value={groqKey} onChange={e=>sGroqKey(e.target.value)} placeholder="gsk_xxxxx..."/>
+              <div style={{marginTop:8,fontSize:12,color:groqKey?"#00C896":"#FF3B5C"}}>{groqKey?"✅ Anahtar kayıtlı (localStorage'da)":"❌ Anahtar girilmedi"}</div>
+              {groqKey&&<Bt onClick={async()=>{sVReply("Test ediliyor...");sVShow(true);const r=await callGroq([{role:"user",content:"Merhaba, ben Kadir. Kısa bir selamlama yap."}],groqKey);sVReply(r);speak(r)}}>🧪 Bağlantıyı Test Et</Bt>}
+            </Cd>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🎤 Nasıl Kullanılır</div>
+              <div style={{fontSize:12,color:"#888",lineHeight:1.8}}>
+                {"🎤 Mikrofon butonuna bas ve konuş. AI her şeyi anlar:"}<br/>
+                {"• \"Su iç\" → su kaydeder"}<br/>
+                {"• \"50 lira yemek harcadım\" → harcama ekler"}<br/>
+                {"• \"Göğüs antrenmanı başla\" → antrenman başlatır"}<br/>
+                {"• \"Bu ay ne kadar harcadım?\" → bilgi verir"}<br/>
+                {"• \"Motivasyon ver\" → seni motive eder"}<br/>
+                {"• Herhangi bir soru sorabilirsin!"}
+              </div>
+            </Cd>
+            <Cd>
+              <div style={{fontSize:14,fontWeight:700,color:"#ddd",marginBottom:8}}>🔊 Ses Ayarı</div>
+              <div style={{fontSize:12,color:"#888"}}>{"Ses: "+(jarvisVoice?jarvisVoice.name:"Yükleniyor...")}</div>
+              <Bt onClick={()=>speak("Merhaba Kadir. Ben JARVIS, senin kişisel asistanınım. Bugün sana nasıl yardımcı olabilirim?")}>🔊 JARVIS Sesini Test Et</Bt>
+            </Cd>
+          </div>)}
+
           {stS==="general"&&(<div>
             <Cd>
               <div style={{fontSize:14,fontWeight:600,marginBottom:8,color:"#ddd"}}>🏠 Ana Sayfa Modu</div>
@@ -773,9 +805,14 @@ function App(){
 
       </div>
       {/* VOICE FEEDBACK */}
-      {vShow&&(<div onClick={()=>sVShow(false)} style={{position:"fixed",bottom:70,left:12,right:12,maxWidth:416,margin:"0 auto",background:"#1a1a24",borderRadius:16,padding:"14px 18px",border:"1px solid rgba(124,92,252,0.3)",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",zIndex:60,animation:"fadeIn 0.2s ease"}}>
-        {vText&&<div style={{fontSize:12,color:"#666",marginBottom:6}}>🎤 "{vText}"</div>}
-        <div style={{fontSize:14,fontWeight:600,color:"#ddd"}}>{vReply}</div>
+      {vShow&&(<div style={{position:"fixed",bottom:70,left:12,right:12,maxWidth:416,margin:"0 auto",background:"#1a1a24",borderRadius:16,padding:"14px 18px",border:"1px solid rgba(124,92,252,0.3)",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",zIndex:60,animation:"fadeIn 0.2s ease"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div style={{flex:1}}>
+            {vText&&<div style={{fontSize:12,color:"#666",marginBottom:6}}>🎤 "{vText}"</div>}
+            <div style={{fontSize:14,fontWeight:600,color:"#ddd",whiteSpace:"pre-wrap"}}>{vLoading?"🤔 Düşünüyorum...":vReply}</div>
+          </div>
+          <button onClick={()=>sVShow(false)} style={{background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:16,flexShrink:0,marginLeft:8}}>✕</button>
+        </div>
       </div>)}
       {/* MIC BUTTON */}
       {hasSpeech&&(<button onClick={startVoice} style={{position:"fixed",bottom:62,right:16,width:48,height:48,borderRadius:24,background:vListen?"#FF3B5C":ACC,color:"#fff",border:"none",cursor:"pointer",fontSize:22,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(124,92,252,0.4)",zIndex:55,animation:vListen?"pulse 1s infinite":"none"}}>
