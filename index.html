@@ -15,6 +15,7 @@ body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-
 input,textarea,select{font-family:inherit;font-size:14px;color:#e8e8e8}
 input[type=number]::-webkit-inner-spin-button{opacity:1}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,59,92,0.5)}70%{box-shadow:0 0 0 15px rgba(255,59,92,0)}100%{box-shadow:0 0 0 0 rgba(255,59,92,0)}}
 .scroll-area{-webkit-overflow-scrolling:touch;overflow-y:auto;overflow-x:hidden}
 .scroll-area::-webkit-scrollbar{width:0;background:transparent}
 </style>
@@ -30,6 +31,8 @@ const LS={get:(k,d)=>{try{const v=localStorage.getItem("kv2_"+k);return v?JSON.p
 function useLS(key,init){const[val,setVal]=useState(()=>LS.get(key,init));const set=useCallback(v=>{setVal(prev=>{const nv=typeof v==="function"?v(prev):v;LS.set(key,nv);return nv})},[key]);return[val,set]}
 /* NOTIFICATION & SOUND SYSTEM */
 const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+const resumeAudio=()=>{if(audioCtx.state==="suspended")audioCtx.resume();document.removeEventListener("click",resumeAudio);document.removeEventListener("touchstart",resumeAudio)};
+document.addEventListener("click",resumeAudio);document.addEventListener("touchstart",resumeAudio);
 const playTone=(freq,dur,type="sine",vol=0.3)=>{try{audioCtx.resume();const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.type=type;o.frequency.value=freq;g.gain.value=vol;g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+dur);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}catch{}};
 const SND={
   rest:()=>{playTone(880,0.15);setTimeout(()=>playTone(1100,0.15),180);setTimeout(()=>playTone(1320,0.2),360)},
@@ -41,6 +44,39 @@ const SND={
 };
 const notify=(title,body,soundKey="task")=>{try{if(SND[soundKey])SND[soundKey]();if("vibrate"in navigator)navigator.vibrate([200,80,200]);if("Notification"in window&&Notification.permission==="granted"){new Notification(title,{body,icon:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>",tag:soundKey+Date.now()})}}catch{}};
 const reqNotifPerm=()=>{if("Notification"in window&&Notification.permission==="default")Notification.requestPermission()};
+/* VOICE COMMAND SYSTEM */
+const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
+const hasSpeech=!!SpeechRec;
+const speak=(text)=>{try{const u=new SpeechSynthesisUtterance(text);u.lang="tr-TR";u.rate=1.1;speechSynthesis.speak(u)}catch{}};
+const parseVoiceCmd=(text,ctx)=>{
+  const t=text.toLowerCase().trim();
+  // Su
+  if(t.includes("su")&&(t.includes("iç")||t.includes("ekle")||t.includes("kaydet"))){
+    const m=t.match(/(\d+)\s*(ml|litre)/);const ml=m?m[2]==="litre"?+m[1]*1000:+m[1]:250;
+    return{type:"water",ml,reply:"💧 "+ml+"ml su eklendi"}
+  }
+  // Harcama
+  if(t.includes("harcama")||t.includes("harcadım")||t.includes("lira")||t.includes("tl")){
+    const m=t.match(/(\d+)\s*(lira|tl)/i);const am=m?+m[1]:0;
+    const cats2=["yemek","ulaşım","market","fatura","eğlence","giyim","sağlık"];
+    const cat=cats2.find(c=>t.includes(c))||"Diğer";
+    if(am>0)return{type:"expense",amount:am,cat:cat.charAt(0).toUpperCase()+cat.slice(1),reply:"💰 "+am+"₺ "+cat+" harcaması eklendi"}
+  }
+  // Antrenman
+  if(t.includes("antrenman")||t.includes("başla")){
+    const groups=Object.entries(ctx.wk||{});
+    const found=groups.find(([k,g])=>t.includes(g.name.toLowerCase().split(" ")[0]));
+    if(found)return{type:"startWorkout",groupKey:found[0],reply:"💪 "+found[1].name+" başlıyor!"}
+  }
+  // Soru
+  if(t.includes("bu ay")||t.includes("harcama")){
+    return{type:"query",qtype:"expense",reply:"💰 Bu ay toplam: ₺"+ctx.tMo}
+  }
+  if(t.includes("bugün")){
+    return{type:"query",qtype:"today",reply:"📅 Bugün "+ctx.todayInfo}
+  }
+  return{type:"unknown",reply:"Anlamadım. Dene: 'su iç', '50 lira yemek harcadım', 'antrenman başla'"}
+};
 const DS=["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
 const MO=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const dkf=d=>{const x=d instanceof Date?d:new Date(d);return`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`};
@@ -162,6 +198,9 @@ function App(){
   const[fTab,sFTab]=useState(0);const[ef,sEf]=useState(false);const[ne,sNe]=useState({amount:"",cat:DEF_CATS[0],note:""});const[pf,sPf]=useState(false);
   // SETTINGS
   const[stS,sStS]=useState(null);const[eW,sEW]=useState(null);
+  // Voice
+  const[vListen,sVListen]=useState(false);const[vText,sVText]=useState("");const[vReply,sVReply]=useState("");const[vShow,sVShow]=useState(false);
+  const recRef=useRef(null);
   // Timer
   useEffect(()=>{if(!aW)return;const t=setInterval(()=>sEl(Math.floor((Date.now()-aW.startTime)/1000)),1000);return()=>clearInterval(t)},[aW]);
   // Request notification permission on mount
@@ -205,6 +244,25 @@ function App(){
   const mExp=useMemo(()=>exp.filter(e=>e.date.startsWith(`${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,"0")}`)),[exp]);
   const tMo=mExp.reduce((a,e)=>a+e.amount,0);
   const bCat=useMemo(()=>{const m={};mExp.forEach(e=>{m[e.cat]=(m[e.cat]||0)+e.amount});return Object.entries(m).sort((a,b)=>b[1]-a[1])},[mExp]);
+  /* VOICE COMMAND */
+  const startVoice=()=>{
+    if(!hasSpeech){sVReply("Tarayıcın sesli komutu desteklemiyor");sVShow(true);return}
+    if(vListen){if(recRef.current)recRef.current.stop();sVListen(false);return}
+    const r=new SpeechRec();r.lang="tr-TR";r.continuous=false;r.interimResults=false;
+    r.onstart=()=>sVListen(true);
+    r.onresult=e=>{const txt=e.results[0][0].transcript;sVText(txt);
+      const todayW=gsfd(NOW).map(x=>x.g.name).join(", ")||"yok";
+      const ctx={wk,tMo,todayInfo:todayW?("Antrenman: "+todayW):("Bugün dinlenme günü")};
+      const cmd=parseVoiceCmd(txt,ctx);
+      sVReply(cmd.reply);speak(cmd.reply);sVShow(true);
+      if(cmd.type==="water"){const wh=hb.find(h=>h.type==="water");if(wh)addW(wh.id,cmd.ml)}
+      if(cmd.type==="expense"&&cmd.amount>0){sExp(p=>[{id:uid(),date:TK,amount:cmd.amount,cat:cmd.cat,note:"Sesli komut"},...p])}
+      if(cmd.type==="startWorkout"&&cmd.groupKey){startW(cmd.groupKey);sMt(1)}
+    };
+    r.onerror=()=>{sVListen(false);sVReply("Ses algılanamadı, tekrar dene");sVShow(true)};
+    r.onend=()=>sVListen(false);
+    recRef.current=r;r.start()
+  };
   /* NOTE DETAIL */
   if(oN){const note=nt.find(n=>n.id===oN);if(note){const proj=pj.find(p=>p.id===note.projectId);
     return(<div style={{maxWidth:440,margin:"0 auto",background:"#0f0f13",height:"100vh",display:"flex",flexDirection:"column"}}>
@@ -433,8 +491,8 @@ function App(){
           const sorted=soT(p.tasks.map((t,i)=>({...t,origIdx:i}))),filtered=fiT(sorted);
           return<div>
             <button onClick={()=>{sWV("main");sPI(null);sXT(null)}} style={{background:"none",border:"none",color:ACC,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>← Projeler</button>
-            <Cd style={{borderLeft:`3px solid ${p.color}`}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{p.name}</div><div style={{fontSize:12,color:"#666"}}>{p.tasks.length} görev • {dn} bitti</div></div><div style={{fontSize:24,fontWeight:900,color:pct===100?"#00C896":p.color}}>{pct}%</div></div>
-              <div style={{height:8,borderRadius:4,background:"rgba(255,255,255,0.06)",marginTop:10}}><div style={{height:8,borderRadius:4,background:pct===100?"#00C896":p.color,width:`${pct}%`}}/></div></Cd>
+            <Cd style={{borderLeft:"3px solid "+p.color}}><div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontSize:18,fontWeight:800,color:"#fff",cursor:"pointer"}} onClick={()=>{const nn=prompt("Proje adı:",p.name);if(nn&&nn.trim())sPj(pr=>pr.map((pp,i)=>i===pI?{...pp,name:nn.trim()}:pp))}}>{p.name} <span style={{fontSize:12,color:"#555"}}>✎</span></div><div style={{fontSize:12,color:"#666"}}>{p.tasks.length} görev • {dn} bitti</div></div><div style={{fontSize:24,fontWeight:900,color:pct===100?"#00C896":p.color}}>{pct}%</div></div>
+              <div style={{height:8,borderRadius:4,background:"rgba(255,255,255,0.06)",marginTop:10}}><div style={{height:8,borderRadius:4,background:pct===100?"#00C896":p.color,width:pct+"%"}}/></div></Cd>
             <div style={{fontSize:14,fontWeight:700,margin:"10px 0 8px",color:"#888"}}>📝 Notlar</div>
             <Cd style={{padding:"10px 14px"}}><div style={{display:"flex",gap:8}}><In id="pnt" placeholder="Not başlığı..." style={{flex:1}}/><button onClick={()=>{const t=document.getElementById("pnt").value;if(!t)return;addN({id:uid(),title:t,projectId:p.id,priority:3,createdAt:tn(),blocks:[{id:uid(),type:"text",content:""}]});document.getElementById("pnt").value=""}} style={{padding:"10px 16px",background:ACC,color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+</button></div></Cd>
             {pNt(p.id).map(n=><div key={n.id} onClick={()=>sON(n.id)} style={{padding:"10px 14px",background:"#1a1a24",borderRadius:12,marginBottom:6,borderLeft:`3px solid ${p.color}`,cursor:"pointer",border:"1px solid rgba(255,255,255,0.06)"}}><div style={{fontSize:14,fontWeight:700,color:"#ddd"}}>{n.title}</div></div>)}
@@ -694,6 +752,15 @@ function App(){
       </div>)}
 
       </div>
+      {/* VOICE FEEDBACK */}
+      {vShow&&(<div onClick={()=>sVShow(false)} style={{position:"fixed",bottom:70,left:12,right:12,maxWidth:416,margin:"0 auto",background:"#1a1a24",borderRadius:16,padding:"14px 18px",border:"1px solid rgba(124,92,252,0.3)",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",zIndex:60,animation:"fadeIn 0.2s ease"}}>
+        {vText&&<div style={{fontSize:12,color:"#666",marginBottom:6}}>🎤 "{vText}"</div>}
+        <div style={{fontSize:14,fontWeight:600,color:"#ddd"}}>{vReply}</div>
+      </div>)}
+      {/* MIC BUTTON */}
+      {hasSpeech&&(<button onClick={startVoice} style={{position:"fixed",bottom:62,right:16,width:48,height:48,borderRadius:24,background:vListen?"#FF3B5C":ACC,color:"#fff",border:"none",cursor:"pointer",fontSize:22,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(124,92,252,0.4)",zIndex:55,animation:vListen?"pulse 1s infinite":"none"}}>
+        {vListen?"⏹":"🎤"}
+      </button>)}
       {/* BOTTOM TAB BAR */}
       <div style={{position:"fixed",bottom:0,left:0,right:0,display:"flex",background:"#13131a",borderTop:"1px solid rgba(255,255,255,0.06)",paddingBottom:"env(safe-area-inset-bottom)",zIndex:50,maxWidth:440,margin:"0 auto"}}>
         {mainTabs.map((t,i)=>{
