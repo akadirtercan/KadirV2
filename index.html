@@ -47,7 +47,7 @@ const reqNotifPerm=()=>{if("Notification"in window&&Notification.permission==="d
 /* VOICE COMMAND SYSTEM */
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 const hasSpeech=!!SpeechRec;
-const speak=(text)=>{try{const u=new SpeechSynthesisUtterance(text);u.lang="tr-TR";u.rate=1.1;speechSynthesis.speak(u)}catch{}};
+const speak=(text,jarvis=false)=>{try{const u=new SpeechSynthesisUtterance(text);u.lang="tr-TR";if(jarvis){u.rate=0.95;u.pitch=0.8;const voices=speechSynthesis.getVoices();const male=voices.find(v=>v.lang.startsWith("tr")&&v.name.toLowerCase().includes("male"))||voices.find(v=>v.lang.startsWith("tr"))||voices.find(v=>v.name.toLowerCase().includes("google")&&v.lang.startsWith("tr"));if(male)u.voice=male}else{u.rate=1.1}speechSynthesis.speak(u)}catch{}};
 const parseVoiceCmd=(text,ctx)=>{
   const t=text.toLowerCase().trim();
   // Su
@@ -212,9 +212,29 @@ function App(){
   /* SPORT HELPERS */
   const gsfd=d=>{const dow=d.getDay();const r=[];Object.entries(wk).forEach(([gk,g])=>{if(g.schedule.includes(dow))r.push({gk,g})});return r};
   const startW=gk=>{const g=wk[gk];if(!g)return;const init={};g.exercises.forEach((ex,ei)=>{for(let s=1;s<=ex.sets;s++){init[`r-${ei}-${s}`]=ex.reps;init[`k-${ei}-${s}`]=ex.kg}});sEv(init);sAW({groupKey:gk,startTime:Date.now()});sCk({});sEl(0);sRk(null);sSr(true);sSTab(1)};
-  const finW=()=>{if(!aW)return;const g=wk[aW.groupKey];sRec(p=>[{dateStr:fD(new Date()),dateKey:dkf(new Date()),groupKey:aW.groupKey,name:g.name,duration:el,totalSets:g.exercises.reduce((a,e)=>a+e.sets,0),doneSets:Object.keys(ck).length},...p]);notify("✅ Antrenman Tamamlandı!",g.name+" • "+fT(el),"success");sAW(null);sCk({});sEl(0);sRk(null);sEv({})};
+  const finW=()=>{if(!aW)return;const g=wk[aW.groupKey];sRec(p=>[{dateStr:fD(new Date()),dateKey:dkf(new Date()),groupKey:aW.groupKey,name:g.name,duration:el,totalSets:g.exercises.reduce((a,e)=>a+e.sets,0),doneSets:Object.keys(ck).length},...p]);notify("✅ Antrenman Tamamlandı!",g.name+" • "+fT(el),"success");speak("Antrenman tamamlandı. "+g.name+", "+fT(el)+" sürdü. Harika iş!",true);sAW(null);sCk({});sEl(0);sRk(null);sEv({})};
   const togCk=(ei,si)=>{const k=`${ei}-${si}`;const w=ck[k];sCk(p=>{const n={...p};if(w)delete n[k];else n[k]=true;return n});if(!w){sRk(`${k}-${Date.now()}`);sSr(true)}};
-  const hRD=useCallback(()=>{notify("⏱ Dinlenme Bitti!","Sonraki sete geç 💪","rest")},[]);
+  const hRD=useCallback(()=>{
+    if(!aW)return notify("⏱ Dinlenme Bitti!","Sonraki sete geç 💪","rest");
+    const g=wk[aW.groupKey];if(!g)return;
+    let nextEx=null,nextSet=0;
+    for(let ei=0;ei<g.exercises.length;ei++){
+      for(let si=1;si<=g.exercises[ei].sets;si++){
+        if(!ck[ei+"-"+si]){nextEx=g.exercises[ei];nextSet=si;break}
+      }
+      if(nextEx)break;
+    }
+    if(nextEx){
+      const kg=ev["k-"+(g.exercises.indexOf(nextEx))+"-"+nextSet]||nextEx.kg;
+      const reps=ev["r-"+(g.exercises.indexOf(nextEx))+"-"+nextSet]||nextEx.reps;
+      const msg=nextEx.name+", Set "+nextSet+", "+reps+" tekrar, "+kg+" kilo";
+      notify("⏱ Dinlenme Bitti!",msg,"rest");
+      speak("Dinlenme bitti. Sıradaki: "+msg,true);
+    }else{
+      notify("⏱ Dinlenme Bitti!","Tüm setler tamamlandı! 🎉","rest");
+      speak("Dinlenme bitti. Tüm setler tamamlandı, tebrikler!",true);
+    }
+  },[aW,wk,ck,ev]);
   const moveEx=(gk,from,to)=>{if(to<0)return;const nw={...wk};const exs=[...nw[gk].exercises];if(to>=exs.length)return;const[item]=exs.splice(from,1);exs.splice(to,0,item);nw[gk]={...nw[gk],exercises:exs};sWk(nw)};
   /* HABIT HELPERS */
   const gHS=(h,dk2)=>{if(h.subs?.length)return getSubsStatus(h,dk2);if(h.log[dk2])return h.log[dk2];const d=new Date(dk2);const n=new Date();n.setHours(0,0,0,0);return d<n?"miss":"pending"};
@@ -254,7 +274,7 @@ function App(){
       const todayW=gsfd(NOW).map(x=>x.g.name).join(", ")||"yok";
       const ctx={wk,tMo,todayInfo:todayW?("Antrenman: "+todayW):("Bugün dinlenme günü")};
       const cmd=parseVoiceCmd(txt,ctx);
-      sVReply(cmd.reply);speak(cmd.reply);sVShow(true);
+      sVReply(cmd.reply);speak(cmd.reply,true);sVShow(true);
       if(cmd.type==="water"){const wh=hb.find(h=>h.type==="water");if(wh)addW(wh.id,cmd.ml)}
       if(cmd.type==="expense"&&cmd.amount>0){sExp(p=>[{id:uid(),date:TK,amount:cmd.amount,cat:cmd.cat,note:"Sesli komut"},...p])}
       if(cmd.type==="startWorkout"&&cmd.groupKey){startW(cmd.groupKey);sMt(1)}
